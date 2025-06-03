@@ -1,0 +1,487 @@
+<main class="nxl-container apps-container apps-chat">
+    <div class="nxl-content without-header nxl-full-content">
+      <div class="main-content d-flex">
+        <!-- Sidebar Chat -->
+        <div class="content-sidebar content-sidebar-xl border-end" id="chat-sidebar" style="width: 30%;">
+          <div class="content-sidebar-header p-3 border-bottom d-flex justify-content-between align-items-center bg-light">
+            <div class="d-flex align-items-center">
+              <i class="bi bi-chat-dots-fill text-primary me-2"></i>
+              <h5 class="m-0 fw-bold">Chat</h5>
+            </div>
+            <div class="position-relative">
+              <input type="text" id="search-chat" class="form-control form-control-sm rounded-pill" placeholder="Cari chat...">
+              <i class="bi bi-search position-absolute" style="right: 10px; top: 7px; font-size: 14px; color: #999;"></i>
+            </div>
+          </div>
+          <div class="content-sidebar-body" id="chat-list" style="overflow-y: auto; max-height: 80vh;">
+            <div class="d-flex justify-content-center align-items-center p-4">
+              <div class="spinner-border text-primary" role="status" style="width: 1.5rem; height: 1.5rem;">
+                <span class="visually-hidden">Memuat...</span>
+              </div>
+              <span class="ms-2 text-muted">Memuat daftar chat...</span>
+            </div>
+          </div>
+        </div>
+  
+        <!-- Panel Obrolan -->
+        <div class="content-area d-flex flex-column w-100 position-relative" id="chat-panel" style="background-color: #f5f6fa;">
+          <div class="d-flex flex-column justify-content-center align-items-center h-100">
+            <div class="text-center p-4">
+              <div class="mb-4">
+                <i class="bi bi-chat-square-text" style="font-size: 64px; color: #e2e8f0;"></i>
+              </div>
+              <h5 class="text-muted">Pilih percakapan di sebelah kiri</h5>
+              <p class="text-muted small">Pesan-pesan akan ditampilkan di sini</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  
+  <style>
+    /* General Styling */
+    :root {
+      --primary-color: #4361ee;
+      --light-primary: rgba(67, 97, 238, 0.1);
+      --bubble-me: #4361ee;
+      --bubble-them: #f8f9fa;
+      --chat-bg: #f5f6fa;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    /* Chat List Styling */
+    .single-item {
+      transition: all 0.2s ease;
+      border-left: 3px solid transparent;
+    }
+    
+    .single-item:hover {
+      background-color: var(--light-primary);
+      border-left: 3px solid var(--primary-color);
+    }
+    
+    .single-item.active {
+      background-color: var(--light-primary);
+      border-left: 3px solid var(--primary-color);
+    }
+    
+    .avatar-image {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 18px;
+      flex-shrink: 0;
+      background-color: #e1e6f9 !important;
+      color: var(--primary-color) !important;
+    }
+    
+    .unread-badge {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background-color: var(--primary-color);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    
+    .time-badge {
+      font-size: 12px;
+      color: #8a96a3;
+    }
+    
+    /* Chat Panel Styling */
+    .chat-header {
+      padding: 15px;
+      background-color: white;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      align-items: center;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    
+    .chat-messages {
+      padding: 20px;
+      overflow-y: auto;
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    
+    .message-bubble {
+      max-width: 70%;
+      padding: 10px 15px;
+      border-radius: 18px;
+      position: relative;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+    
+    .message-bubble.me {
+      background-color: var(--bubble-me);
+      color: white;
+      border-bottom-right-radius: 4px;
+      align-self: flex-end;
+    }
+    
+    .message-bubble.them {
+      background-color: var(--bubble-them);
+      color: #333;
+      border-bottom-left-radius: 4px;
+      align-self: flex-start;
+    }
+    
+    .message-time {
+      font-size: 11px;
+      margin-top: 5px;
+      text-align: right;
+    }
+    
+    .message-bubble.me .message-time {
+      color: rgba(255, 255, 255, 0.8);
+    }
+    
+    .message-bubble.them .message-time {
+      color: #8a96a3;
+    }
+    
+    .chat-input-container {
+      padding: 15px;
+      background-color: white;
+      border-top: 1px solid #e0e0e0;
+    }
+    
+    .chat-input {
+      border-radius: 24px;
+      resize: none;
+      overflow: hidden;
+      padding-right: 45px;
+      height: 48px;
+    }
+    
+    .send-button {
+      position: absolute;
+      right: 8px;
+      bottom: 8px;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    /* Responsive fixes */
+    @media (max-width: 768px) {
+      .content-sidebar {
+        width: 100% !important;
+        display: none;
+      }
+      
+      .show-sidebar .content-sidebar {
+        display: block;
+      }
+      
+      .show-sidebar .content-area {
+        display: none !important;
+      }
+    }
+  </style>
+  
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+  <script>
+    const token = localStorage.getItem('token');
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionId = urlParams.get('id');
+  
+    const socket = io('http://localhost:3000');
+    socket.emit('join-session', sessionId);
+  
+    socket.on('receive-message', (data) => {
+      if (data.contactId === currentContactId) {
+        loadChatMessages(currentContactId, currentContactName);
+        playNotificationSound();
+      } else {
+        // Update chat list to show new message indicator
+        loadChatList();
+      }
+    });
+  
+    function playNotificationSound() {
+      const audio = new Audio('/assets/sounds/message.mp3');
+      audio.play();
+    }
+  
+    let currentContactId = null;
+    let currentContactName = null;
+    let allChats = [];
+  
+    async function loadChatList() {
+      const container = document.getElementById('chat-list');
+      container.innerHTML = `
+        <div class="d-flex justify-content-center align-items-center p-4">
+          <div class="spinner-border text-primary" role="status" style="width: 1.5rem; height: 1.5rem;">
+            <span class="visually-hidden">Memuat...</span>
+          </div>
+          <span class="ms-2 text-muted">Memuat daftar chat...</span>
+        </div>
+      `;
+  
+      try {
+        const res = await fetch(`/api/whatsapp/${sessionId}/chats`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+  
+        const data = await res.json();
+        allChats = data.chats || [];
+        
+        if (!data.success || data.chats.length === 0) {
+          container.innerHTML = `
+            <div class="text-center p-5">
+              <i class="bi bi-chat-left-text" style="font-size: 48px; color: #e2e8f0;"></i>
+              <p class="mt-3 text-muted">Tidak ada chat ditemukan</p>
+            </div>
+          `;
+          return;
+        }
+  
+        renderChatList(data.chats);
+  
+      } catch (error) {
+        console.error(error);
+        container.innerHTML = `
+          <div class="alert alert-danger mx-3 my-4">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            Gagal memuat chat
+          </div>
+        `;
+      }
+    }
+    
+    function renderChatList(chats) {
+      const container = document.getElementById('chat-list');
+      container.innerHTML = '';
+      
+      chats.forEach(chat => {
+        const item = document.createElement('div');
+        item.className = `p-3 d-flex position-relative border-bottom c-pointer single-item ${currentContactId === chat.id ? 'active' : ''}`;
+        item.style.cursor = 'pointer';
+        
+        const initial = (chat.name || '?')[0].toUpperCase();
+        
+        item.innerHTML = `
+          <div class="avatar-image">
+            ${initial}
+          </div>
+          <div class="ms-3 item-desc flex-grow-1">
+            <div class="w-100 d-flex align-items-center justify-content-between">
+              <div class="fw-medium text-truncate" style="max-width: 70%;">
+                ${chat.name || '(Tanpa Nama)'}
+              </div>
+              <div class="time-badge">
+                ${getCurrentTime()}
+              </div>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mt-1">
+              <p class="small text-muted mb-0 text-truncate" style="max-width: 85%;">
+                ${chat.id}
+              </p>
+            </div>
+          </div>
+        `;
+        
+        item.onclick = () => {
+          document.querySelectorAll('.single-item').forEach(el => el.classList.remove('active'));
+          item.classList.add('active');
+          loadChatMessages(chat.id, chat.name);
+        };
+        
+        container.appendChild(item);
+      });
+    }
+    
+    function getCurrentTime() {
+      const now = new Date();
+      return now.getHours().toString().padStart(2, '0') + ':' + 
+             now.getMinutes().toString().padStart(2, '0');
+    }
+  
+    async function loadChatMessages(contactId, contactName) {
+      currentContactId = contactId;
+      currentContactName = contactName;
+      
+      const panel = document.getElementById('chat-panel');
+      panel.innerHTML = `
+        <div class="d-flex justify-content-center align-items-center h-100">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Memuat pesan...</span>
+          </div>
+          <span class="ms-2 text-muted">Memuat pesan...</span>
+        </div>
+      `;
+  
+      try {
+        const res = await fetch(`/api/whatsapp/${sessionId}/chats/${contactId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+  
+        if (!data.success) {
+          panel.innerHTML = `
+            <div class="d-flex flex-column justify-content-center align-items-center h-100">
+              <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                Gagal memuat obrolan
+              </div>
+            </div>
+          `;
+          return;
+        }
+  
+        let messagesHTML = '';
+        
+        if (data.messages.length === 0) {
+          messagesHTML = `
+            <div class="text-center my-5 py-5">
+              <i class="bi bi-chat" style="font-size: 48px; color: #e2e8f0;"></i>
+              <p class="mt-3 text-muted">Belum ada pesan</p>
+            </div>
+          `;
+        } else {
+          messagesHTML = data.messages.map(msg => {
+            const time = new Date(msg.timestamp * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            return `
+              <div class="message-bubble ${msg.fromMe ? 'me' : 'them'}">
+                <div class="message-content">${msg.body}</div>
+                <div class="message-time">${time}</div>
+              </div>
+            `;
+          }).join('');
+        }
+  
+        panel.innerHTML = `
+          <div class="chat-header">
+            <div class="avatar-image me-3">
+              ${(contactName || '?')[0].toUpperCase()}
+            </div>
+            <div>
+              <h6 class="mb-0 fw-bold">${contactName || 'Tanpa Nama'}</h6>
+              <div class="small text-muted">${contactId}</div>
+            </div>
+          </div>
+          
+          <div class="chat-messages" id="messages-container">
+            ${messagesHTML}
+          </div>
+          
+          <div class="chat-input-container">
+            <div class="position-relative">
+              <textarea id="messageInput-${contactId}" class="form-control chat-input" rows="1" placeholder="Ketik pesan..."></textarea>
+              <button class="btn btn-primary send-button" onclick="sendMessage('${contactId}')">
+                <i class="bi bi-send-fill"></i>
+              </button>
+            </div>
+          </div>
+        `;
+  
+        // Auto resize textarea
+        const textarea = document.getElementById(`messageInput-${contactId}`);
+        if (textarea) {
+          textarea.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight < 120 ? this.scrollHeight : 120) + 'px';
+          });
+          
+          // Enter to send, Shift+Enter for newline
+          textarea.addEventListener('keydown', function(e) {
+            if (e.keyCode === 13 && !e.shiftKey) {
+              e.preventDefault();
+              sendMessage(contactId);
+            }
+          });
+        }
+  
+        // Scroll to bottom
+        setTimeout(() => {
+          const messagesContainer = document.getElementById('messages-container');
+          if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }, 100);
+  
+      } catch (err) {
+        console.error(err);
+        panel.innerHTML = `
+          <div class="d-flex flex-column justify-content-center align-items-center h-100">
+            <div class="alert alert-danger">
+              <i class="bi bi-exclamation-triangle-fill me-2"></i>
+              Terjadi kesalahan saat memuat pesan
+            </div>
+          </div>
+        `;
+      }
+    }
+  
+    async function sendMessage(contactId) {
+      const input = document.getElementById(`messageInput-${contactId}`);
+      const message = input.value;
+      if (!message.trim()) return;
+  
+      try {
+        const res = await fetch(`/api/whatsapp/${sessionId}/chats/${contactId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ message })
+        });
+  
+        const data = await res.json();
+        if (data.success) {
+          input.value = '';
+          input.style.height = 'auto';
+          loadChatMessages(contactId, currentContactName);
+        } else {
+          alert(data.message || 'Gagal mengirim pesan');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Terjadi kesalahan saat mengirim pesan');
+      }
+    }
+    
+    // Fitur pencarian
+    function setupSearch() {
+      const searchInput = document.getElementById('search-chat');
+      if (!searchInput) return;
+      
+      searchInput.addEventListener('input', function() {
+        const query = this.value.toLowerCase();
+        
+        if (!allChats || allChats.length === 0) return;
+        
+        const filteredChats = allChats.filter(chat => {
+          const name = (chat.name || '').toLowerCase();
+          const id = chat.id.toLowerCase();
+          return name.includes(query) || id.includes(query);
+        });
+        
+        renderChatList(filteredChats);
+      });
+    }
+  
+    document.addEventListener('DOMContentLoaded', () => {
+      loadChatList();
+      setupSearch();
+    });
+  </script>

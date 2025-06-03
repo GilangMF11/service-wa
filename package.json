@@ -1,0 +1,31 @@
+{
+    "name": "whatsapp-api",
+    "version": "1.0.0",
+    "description": "API untuk mengirim pesan WhatsApp menggunakan Express.js dan whatsapp-web.js",
+    "main": "app.js",
+    "scripts": {
+        "start": "node app.js",
+        "dev": "nodemon app.js",
+        "migrate": "node scripts/migrate.js",
+        "migrate:dev": "NODE_ENV=development SEED_DATABASE=true node scripts/migrate.js",
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "install-broadcast": "npm install multer csv-parser && mkdir -p uploads/broadcast temp middleware"
+    },
+    "dependencies": {
+        "bcrypt": "^5.1.1",
+        "csv-parser": "^3.2.0",
+        "dotenv": "^16.5.0",
+        "ejs": "^3.1.10",
+        "express": "^4.18.2",
+        "jsonwebtoken": "^9.0.2",
+        "multer": "^2.0.0",
+        "pg": "^8.15.6",
+        "qrcode-terminal": "^0.12.0",
+        "socket.io": "^4.8.1",
+        "uuid": "^11.1.0",
+        "whatsapp-web.js": "^1.22.0"
+    },
+    "devDependencies": {
+        "nodemon": "^3.0.1"
+    }
+}

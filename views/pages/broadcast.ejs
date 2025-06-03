@@ -1,0 +1,1028 @@
+<main class="nxl-container">
+    <div class="nxl-content">
+        <!-- [ page-header ] start -->
+        <div class="page-header mb-4">
+            <div class="page-header-left d-flex align-items-center">
+                <div class="page-header-title">
+                    <h4 class="fw-bold text-primary mb-1">Broadcast Management</h4>
+                </div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb ms-3 mb-0">
+                        <li class="breadcrumb-item"><a href="/" class="text-decoration-none">Home</a></li>
+                        <li class="breadcrumb-item active">Broadcast</li>
+                    </ol>
+                </nav>
+            </div>
+            <div class="page-header-right ms-auto">
+                <div class="page-header-right-items">
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-primary px-4 rounded-start" data-bs-toggle="modal" data-bs-target="#createListModal">
+                            <i class="bi bi-list-ul me-2"></i>New List
+                        </button>
+                        <button type="button" class="btn btn-success px-4 rounded-end" data-bs-toggle="modal" data-bs-target="#sendBroadcastModal">
+                            <i class="bi bi-broadcast me-2"></i>Send Broadcast
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- [ page-header ] end -->
+
+        <!-- Session Selector -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-lg-4">
+                                <label class="form-label fw-medium">Select WhatsApp Session</label>
+                                <select id="sessionSelect" class="form-select">
+                                    <option value="">Select a session...</option>
+                                </select>
+                            </div>
+                            <div class="col-lg-4">
+                                <label class="form-label fw-medium">Session Status</label>
+                                <div class="d-flex align-items-center">
+                                    <span id="sessionStatus" class="badge bg-secondary">Not Selected</span>
+                                </div>
+                            </div>
+                            <div class="col-lg-4">
+                                <label class="form-label fw-medium">&nbsp;</label>
+                                <div class="d-grid">
+                                    <button class="btn btn-outline-primary" onclick="loadBroadcastData()">
+                                        <i class="bi bi-arrow-clockwise me-2"></i>Refresh Data
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content" id="mainContent" style="display: none;">
+            <div class="row g-4">
+                <!-- Broadcast Lists -->
+                <div class="col-lg-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-white pt-4 pb-3 border-0">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-list-ul text-primary fs-4 me-2"></i>
+                                    <h5 class="card-title fw-bold mb-0">Broadcast Lists</h5>
+                                </div>
+                                <div class="badge bg-primary rounded-pill" id="totalListsText">0 lists</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!-- Lists Loading -->
+                            <div id="listsLoading" class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status"></div>
+                                <p class="mt-3 text-muted">Loading lists...</p>
+                            </div>
+
+                            <!-- Lists Empty -->
+                            <div id="listsEmpty" class="text-center py-4" style="display: none;">
+                                <i class="bi bi-list-ul text-muted" style="font-size: 3rem;"></i>
+                                <h6 class="mt-3 text-muted">No broadcast lists</h6>
+                                <p class="text-muted mb-3">Create your first broadcast list</p>
+                                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createListModal">
+                                    <i class="bi bi-plus-circle me-2"></i>Create List
+                                </button>
+                            </div>
+
+                            <!-- Lists Content -->
+                            <div id="listsContent" style="display: none;">
+                                <div id="broadcastLists">
+                                    <!-- Lists will be loaded here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Broadcast Campaigns -->
+                <div class="col-lg-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-white pt-4 pb-3 border-0">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-broadcast text-primary fs-4 me-2"></i>
+                                    <h5 class="card-title fw-bold mb-0">Recent Campaigns</h5>
+                                </div>
+                                <div class="badge bg-success rounded-pill" id="totalCampaignsText">0 campaigns</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!-- Campaigns Loading -->
+                            <div id="campaignsLoading" class="text-center py-4">
+                                <div class="spinner-border text-success" role="status"></div>
+                                <p class="mt-3 text-muted">Loading campaigns...</p>
+                            </div>
+
+                            <!-- Campaigns Empty -->
+                            <div id="campaignsEmpty" class="text-center py-4" style="display: none;">
+                                <i class="bi bi-broadcast text-muted" style="font-size: 3rem;"></i>
+                                <h6 class="mt-3 text-muted">No campaigns yet</h6>
+                                <p class="text-muted mb-3">Send your first broadcast</p>
+                                <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#sendBroadcastModal">
+                                    <i class="bi bi-broadcast me-2"></i>Send Broadcast
+                                </button>
+                            </div>
+
+                            <!-- Campaigns Content -->
+                            <div id="campaignsContent" style="display: none;">
+                                <div id="broadcastCampaigns">
+                                    <!-- Campaigns will be loaded here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Session Not Selected Message -->
+        <div class="row" id="sessionNotSelected">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center py-5">
+                        <i class="bi bi-whatsapp text-muted" style="font-size: 4rem;"></i>
+                        <h5 class="mt-3 text-muted">Select WhatsApp Session</h5>
+                        <p class="text-muted">Please select a WhatsApp session to manage broadcasts</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<!-- Create Broadcast List Modal -->
+<div class="modal fade" id="createListModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-plus-circle me-2"></i>Create Broadcast List
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="createListForm">
+                <div class="modal-body p-4">
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <label for="listName" class="form-label fw-medium">List Name *</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white border-end-0">
+                                    <i class="bi bi-list-ul text-primary"></i>
+                                </span>
+                                <input type="text" class="form-control border-start-0" id="listName" required placeholder="Enter list name">
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <label for="listDescription" class="form-label fw-medium">Description</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white border-end-0">
+                                    <i class="bi bi-card-text text-primary"></i>
+                                </span>
+                                <input type="text" class="form-control border-start-0" id="listDescription" placeholder="Enter description">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="form-label fw-medium">Add Contacts</label>
+                        <div class="border rounded p-3">
+                            <div class="mb-3">
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white border-end-0">
+                                        <i class="bi bi-person-plus text-primary"></i>
+                                    </span>
+                                    <input type="text" id="contactNumber" class="form-control border-start-0 border-end-0" placeholder="Contact number (628xxxxxxxxx)">
+                                    <input type="text" id="contactName" class="form-control border-start-0" placeholder="Contact name">
+                                    <button type="button" class="btn btn-outline-primary" onclick="addContactToList()">
+                                        <i class="bi bi-plus"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="contactsTextarea" class="form-label small">Or paste multiple contacts (format: number,name per line)</label>
+                                <textarea id="contactsTextarea" class="form-control" rows="3" placeholder="628123456789,John Doe&#10;628987654321,Jane Smith"></textarea>
+                                <button type="button" class="btn btn-sm btn-outline-secondary mt-2" onclick="parseContactsFromTextarea()">
+                                    <i class="bi bi-upload me-1"></i>Parse Contacts
+                                </button>
+                            </div>
+                            
+                            <div id="contactsList" class="mt-3">
+                                <!-- Added contacts will appear here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 px-4 pb-4">
+                    <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4">
+                        <i class="bi bi-check2 me-2"></i>Create List
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Send Broadcast Modal -->
+<div class="modal fade" id="sendBroadcastModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-broadcast me-2"></i>Send Broadcast
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="sendBroadcastForm">
+                <div class="modal-body p-4">
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <label for="campaignName" class="form-label fw-medium">Campaign Name *</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white border-end-0">
+                                    <i class="bi bi-tag text-success"></i>
+                                </span>
+                                <input type="text" class="form-control border-start-0" id="campaignName" required placeholder="Enter campaign name">
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <label for="broadcastList" class="form-label fw-medium">Broadcast List *</label>
+                            <select id="broadcastList" class="form-select" required>
+                                <option value="">Select broadcast list...</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="messageContent" class="form-label fw-medium">Message Content *</label>
+                        <textarea id="messageContent" class="form-control" rows="4" required placeholder="Type your broadcast message here..."></textarea>
+                        <div class="form-text">
+                            <span id="messageLength">0</span> characters
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <label for="sendDelay" class="form-label fw-medium">Delay Between Messages (ms)</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white border-end-0">
+                                    <i class="bi bi-clock text-success"></i>
+                                </span>
+                                <input type="number" class="form-control border-start-0" id="sendDelay" value="1000" min="500" max="10000">
+                            </div>
+                            <div class="form-text">Recommended: 1000-3000ms to avoid being blocked</div>
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <label class="form-label fw-medium">Selected List Info</label>
+                            <div id="selectedListInfo" class="p-3 bg-light rounded">
+                                <p class="mb-0 text-muted">Select a list to see details</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 px-4 pb-4">
+                    <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success px-4">
+                        <i class="bi bi-send me-2"></i>Send Broadcast
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Campaign Details Modal -->
+<div class="modal fade" id="campaignDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-graph-up me-2"></i>Campaign Details
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div id="campaignDetailsContent">
+                    <!-- Campaign details will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card {
+        border-radius: 12px;
+        transition: all 0.3s ease;
+    }
+    
+    .btn {
+        border-radius: 6px;
+        padding: 0.5rem 1.25rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-primary {
+        background: linear-gradient(45deg, #4a6bff, #657eff);
+        border: none;
+        box-shadow: 0 4px 12px rgba(74, 107, 255, 0.2);
+    }
+    
+    .btn-primary:hover {
+        background: linear-gradient(45deg, #3955d8, #4a6bff);
+        box-shadow: 0 6px 16px rgba(74, 107, 255, 0.3);
+        transform: translateY(-2px);
+    }
+    
+    .btn-success {
+        background: linear-gradient(45deg, #28a745, #5cb85c);
+        border: none;
+        box-shadow: 0 4px 12px rgba(40, 167, 69, 0.2);
+    }
+    
+    .btn-success:hover {
+        background: linear-gradient(45deg, #218838, #28a745);
+        box-shadow: 0 6px 16px rgba(40, 167, 69, 0.3);
+        transform: translateY(-2px);
+    }
+    
+    .text-primary {
+        color: #4a6bff !important;
+    }
+    
+    .contact-item {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 0.5rem;
+        margin-bottom: 0.5rem;
+        display: flex;
+        justify-content: between;
+        align-items: center;
+    }
+    
+    .broadcast-list-item {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    
+    .broadcast-list-item:hover {
+        border-color: #4a6bff;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(74, 107, 255, 0.1);
+    }
+    
+    .campaign-item {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .status-sending {
+        background: linear-gradient(45deg, #ffc107, #ffca28) !important;
+        color: #212529 !important;
+    }
+    
+    .status-completed {
+        background: linear-gradient(45deg, #28a745, #5cb85c) !important;
+    }
+    
+    .status-failed {
+        background: linear-gradient(45deg, #dc3545, #ef5350) !important;
+    }
+    
+    .status-draft {
+        background: linear-gradient(45deg, #6c757d, #8a929b) !important;
+    }
+</style>
+
+<script>
+    let currentSessionId = null;
+    let broadcastLists = [];
+    let broadcastCampaigns = [];
+    let contactsToAdd = [];
+
+    // Get token from localStorage
+    const getToken = () => localStorage.getItem('token');
+
+    // Check authentication
+    const checkAuth = () => {
+        if (!getToken()) {
+            window.location.href = '/auth/login';
+            return false;
+        }
+        return true;
+    };
+
+    // Toast function for notifications
+    function showToast(message, type = 'info') {
+        let toastContainer = document.querySelector('.toast-container');
+        if (!toastContainer) {
+            toastContainer = document.createElement('div');
+            toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+            document.body.appendChild(toastContainer);
+        }
+        
+        let bgColor = 'bg-primary';
+        let icon = 'bi-info-circle-fill';
+        
+        if (type === 'success') {
+            bgColor = 'bg-success';
+            icon = 'bi-check-circle-fill';
+        } else if (type === 'warning') {
+            bgColor = 'bg-warning text-dark';
+            icon = 'bi-exclamation-triangle-fill';
+        } else if (type === 'error') {
+            bgColor = 'bg-danger';
+            icon = 'bi-x-circle-fill';
+        }
+        
+        const toastEl = document.createElement('div');
+        toastEl.className = `toast ${bgColor} text-white border-0 shadow`;
+        toastEl.innerHTML = `
+            <div class="toast-body d-flex align-items-center">
+                <i class="bi ${icon} me-2 fs-5"></i>
+                <span>${message}</span>
+                <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="toast"></button>
+            </div>
+        `;
+        
+        toastContainer.appendChild(toastEl);
+        const toast = new bootstrap.Toast(toastEl);
+        toast.show();
+        
+        toastEl.addEventListener('hidden.bs.toast', function() {
+            toastEl.remove();
+        });
+    }
+
+    // API calls with authentication
+    const apiCall = async (url, options = {}) => {
+        const token = getToken();
+        const headers = {
+            'Content-Type': 'application/json',
+            ...options.headers
+        };
+        
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(url, {
+            ...options,
+            headers
+        });
+
+        if (response.status === 401) {
+            localStorage.removeItem('token');
+            window.location.href = '/auth/login';
+            return;
+        }
+
+        return response;
+    };
+
+    // Load WhatsApp sessions
+    const loadSessions = async () => {
+        try {
+            const response = await apiCall('/api/whatsapp/sessions');
+            const data = await response.json();
+            
+            if (data.success) {
+                const sessionSelect = document.getElementById('sessionSelect');
+                sessionSelect.innerHTML = '<option value="">Select a session...</option>';
+                
+                data.sessions.forEach(session => {
+                    const option = document.createElement('option');
+                    option.value = session.session_id;
+                    option.textContent = `${session.description || session.session_id} (${session.isConnected ? 'Connected' : 'Disconnected'})`;
+                    option.disabled = !session.isConnected;
+                    sessionSelect.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading sessions:', error);
+            showToast('Failed to load sessions', 'error');
+        }
+    };
+
+    // Session selection change handler
+    document.getElementById('sessionSelect').addEventListener('change', function() {
+        const sessionId = this.value;
+        
+        if (sessionId) {
+            currentSessionId = sessionId;
+            document.getElementById('sessionStatus').textContent = 'Connected';
+            document.getElementById('sessionStatus').className = 'badge bg-success';
+            document.getElementById('mainContent').style.display = 'block';
+            document.getElementById('sessionNotSelected').style.display = 'none';
+            loadBroadcastData();
+        } else {
+            currentSessionId = null;
+            document.getElementById('sessionStatus').textContent = 'Not Selected';
+            document.getElementById('sessionStatus').className = 'badge bg-secondary';
+            document.getElementById('mainContent').style.display = 'none';
+            document.getElementById('sessionNotSelected').style.display = 'block';
+        }
+    });
+
+    // Load broadcast data
+    const loadBroadcastData = async () => {
+        if (!currentSessionId) return;
+        
+        await Promise.all([
+            loadBroadcastLists(),
+            loadBroadcastCampaigns()
+        ]);
+    };
+
+    // Load broadcast lists
+    const loadBroadcastLists = async () => {
+        try {
+            document.getElementById('listsLoading').style.display = 'block';
+            document.getElementById('listsContent').style.display = 'none';
+            document.getElementById('listsEmpty').style.display = 'none';
+            
+            const response = await apiCall(`/api/whatsapp/${currentSessionId}/broadcast/lists`);
+            const data = await response.json();
+            
+            if (data.success) {
+                broadcastLists = data.data.lists;
+                
+                if (broadcastLists.length === 0) {
+                    document.getElementById('listsLoading').style.display = 'none';
+                    document.getElementById('listsEmpty').style.display = 'block';
+                    document.getElementById('totalListsText').textContent = '0 lists';
+                } else {
+                    document.getElementById('listsLoading').style.display = 'none';
+                    document.getElementById('listsContent').style.display = 'block';
+                    document.getElementById('totalListsText').textContent = `${broadcastLists.length} lists`;
+                    renderBroadcastLists();
+                    updateBroadcastListSelect();
+                }
+            }
+        } catch (error) {
+            console.error('Error loading broadcast lists:', error);
+            showToast('Failed to load broadcast lists', 'error');
+        }
+    };
+
+    // Render broadcast lists
+    const renderBroadcastLists = () => {
+        const container = document.getElementById('broadcastLists');
+        container.innerHTML = '';
+        
+        broadcastLists.forEach(list => {
+            const listItem = document.createElement('div');
+            listItem.className = 'broadcast-list-item';
+            listItem.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <h6 class="fw-bold mb-1">${list.name}</h6>
+                        <p class="text-muted mb-2 small">${list.description || 'No description'}</p>
+                        <div class="d-flex align-items-center">
+                            <span class="badge bg-light text-dark me-2">
+                                <i class="bi bi-people me-1"></i>${list.contact_count} contacts
+                            </span>
+                            <span class="badge bg-info text-white">
+                                <i class="bi bi-broadcast me-1"></i>${list.campaign_count} campaigns
+                            </span>
+                        </div>
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-three-dots-vertical"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" onclick="editBroadcastList(${list.id})"><i class="bi bi-pencil me-2"></i>Edit</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="viewContacts(${list.id})"><i class="bi bi-people me-2"></i>View Contacts</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="#" onclick="deleteBroadcastList(${list.id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
+                        </ul>
+                    </div>
+                </div>
+            `;
+            container.appendChild(listItem);
+        });
+    };
+
+    // Load broadcast campaigns
+    const loadBroadcastCampaigns = async () => {
+        try {
+            document.getElementById('campaignsLoading').style.display = 'block';
+            document.getElementById('campaignsContent').style.display = 'none';
+            document.getElementById('campaignsEmpty').style.display = 'none';
+            
+            const response = await apiCall(`/api/whatsapp/${currentSessionId}/broadcast/campaigns`);
+            const data = await response.json();
+            
+            if (data.success) {
+                broadcastCampaigns = data.data.campaigns;
+                
+                if (broadcastCampaigns.length === 0) {
+                    document.getElementById('campaignsLoading').style.display = 'none';
+                    document.getElementById('campaignsEmpty').style.display = 'block';
+                    document.getElementById('totalCampaignsText').textContent = '0 campaigns';
+                } else {
+                    document.getElementById('campaignsLoading').style.display = 'none';
+                    document.getElementById('campaignsContent').style.display = 'block';
+                    document.getElementById('totalCampaignsText').textContent = `${broadcastCampaigns.length} campaigns`;
+                    renderBroadcastCampaigns();
+                }
+            }
+        } catch (error) {
+            console.error('Error loading broadcast campaigns:', error);
+            showToast('Failed to load broadcast campaigns', 'error');
+        }
+    };
+
+    // Render broadcast campaigns
+    const renderBroadcastCampaigns = () => {
+        const container = document.getElementById('broadcastCampaigns');
+        container.innerHTML = '';
+        
+        broadcastCampaigns.forEach(campaign => {
+            const campaignItem = document.createElement('div');
+            campaignItem.className = 'campaign-item';
+            campaignItem.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <div class="d-flex align-items-center mb-2">
+                            <h6 class="fw-bold mb-0 me-2">${campaign.campaign_name}</h6>
+                            <span class="badge status-${campaign.status}">${campaign.status.toUpperCase()}</span>
+                        </div>
+                        <p class="text-muted mb-2 small">
+                            <i class="bi bi-list-ul me-1"></i>${campaign.list_name}
+                        </p>
+                        <div class="d-flex align-items-center">
+                            <span class="badge bg-light text-dark me-2">
+                                <i class="bi bi-check2 me-1"></i>${campaign.sent_count}/${campaign.total_contacts} sent
+                            </span>
+                            ${campaign.failed_count > 0 ? `<span class="badge bg-danger"><i class="bi bi-x me-1"></i>${campaign.failed_count} failed</span>` : ''}
+                        </div>
+                        <small class="text-muted">
+                            <i class="bi bi-calendar me-1"></i>${new Date(campaign.created_at).toLocaleString()}
+                        </small>
+                    </div>
+                    <button class="btn btn-sm btn-outline-info" onclick="viewCampaignDetails(${campaign.id})">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                </div>
+            `;
+            container.appendChild(campaignItem);
+        });
+    };
+
+    // Update broadcast list select in send modal
+    const updateBroadcastListSelect = () => {
+        const select = document.getElementById('broadcastList');
+        select.innerHTML = '<option value="">Select broadcast list...</option>';
+        
+        broadcastLists.forEach(list => {
+            const option = document.createElement('option');
+            option.value = list.id;
+            option.textContent = `${list.name} (${list.contact_count} contacts)`;
+            option.dataset.contactCount = list.contact_count;
+            option.dataset.description = list.description;
+            select.appendChild(option);
+        });
+    };
+
+    // Handle broadcast list selection change
+    document.getElementById('broadcastList').addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        const infoDiv = document.getElementById('selectedListInfo');
+        
+        if (selectedOption.value) {
+            infoDiv.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-info-circle text-primary me-2"></i>
+                    <div>
+                        <div class="fw-medium">${selectedOption.textContent}</div>
+                        <small class="text-muted">${selectedOption.dataset.description || 'No description'}</small>
+                    </div>
+                </div>
+            `;
+        } else {
+            infoDiv.innerHTML = '<p class="mb-0 text-muted">Select a list to see details</p>';
+        }
+    });
+
+    // Message length counter
+    document.getElementById('messageContent').addEventListener('input', function() {
+        document.getElementById('messageLength').textContent = this.value.length;
+    });
+
+    // Contact management functions
+    const addContactToList = () => {
+        const number = document.getElementById('contactNumber').value.trim();
+        const name = document.getElementById('contactName').value.trim();
+        
+        if (!number) {
+            showToast('Contact number is required', 'warning');
+            return;
+        }
+        
+        // Basic number validation
+        const cleanNumber = number.replace(/\D/g, '');
+        if (cleanNumber.length < 10) {
+            showToast('Invalid phone number', 'warning');
+            return;
+        }
+        
+        // Check if contact already exists
+        const exists = contactsToAdd.find(c => c.number === cleanNumber);
+        if (exists) {
+            showToast('Contact already added', 'warning');
+            return;
+        }
+        
+        contactsToAdd.push({
+            number: cleanNumber,
+            name: name || cleanNumber
+        });
+        
+        renderContactsList();
+        
+        // Clear inputs
+        document.getElementById('contactNumber').value = '';
+        document.getElementById('contactName').value = '';
+    };
+
+    const parseContactsFromTextarea = () => {
+        const textarea = document.getElementById('contactsTextarea').value.trim();
+        if (!textarea) return;
+        
+        const lines = textarea.split('\n');
+        let added = 0;
+        
+        lines.forEach(line => {
+            const parts = line.trim().split(',');
+            if (parts.length >= 1) {
+                const number = parts[0].replace(/\D/g, '');
+                const name = parts[1] ? parts[1].trim() : number;
+                
+                if (number.length >= 10) {
+                    const exists = contactsToAdd.find(c => c.number === number);
+                    if (!exists) {
+                        contactsToAdd.push({ number, name });
+                        added++;
+                    }
+                }
+            }
+        });
+        
+        if (added > 0) {
+            renderContactsList();
+            document.getElementById('contactsTextarea').value = '';
+            showToast(`${added} contacts added`, 'success');
+        }
+    };
+
+    const renderContactsList = () => {
+        const container = document.getElementById('contactsList');
+        container.innerHTML = '';
+        
+        if (contactsToAdd.length === 0) {
+            container.innerHTML = '<p class="text-muted mb-0">No contacts added yet</p>';
+            return;
+        }
+        
+        contactsToAdd.forEach((contact, index) => {
+            const contactDiv = document.createElement('div');
+            contactDiv.className = 'contact-item';
+            contactDiv.innerHTML = `
+                <div class="flex-grow-1">
+                    <span class="fw-medium">${contact.name}</span>
+                    <small class="text-muted ms-2">${contact.number}</small>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeContactFromList(${index})">
+                    <i class="bi bi-x"></i>
+                </button>
+            `;
+            container.appendChild(contactDiv);
+        });
+        
+        // Add summary
+        const summary = document.createElement('div');
+        summary.className = 'mt-2 text-center';
+        summary.innerHTML = `<small class="text-muted">${contactsToAdd.length} contacts ready to add</small>`;
+        container.appendChild(summary);
+    };
+
+    const removeContactFromList = (index) => {
+        contactsToAdd.splice(index, 1);
+        renderContactsList();
+    };
+
+    // Form submissions
+    document.getElementById('createListForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Creating...';
+        submitBtn.disabled = true;
+        
+        const listName = document.getElementById('listName').value;
+        const listDescription = document.getElementById('listDescription').value;
+        
+        try {
+            const response = await apiCall(`/api/whatsapp/${currentSessionId}/broadcast/lists`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    name: listName,
+                    description: listDescription,
+                    contacts: contactsToAdd
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                bootstrap.Modal.getInstance(document.getElementById('createListModal')).hide();
+                document.getElementById('createListForm').reset();
+                contactsToAdd = [];
+                renderContactsList();
+                loadBroadcastLists();
+                showToast('Broadcast list created successfully!', 'success');
+            } else {
+                showToast(data.message || 'Failed to create broadcast list', 'error');
+            }
+        } catch (error) {
+            console.error('Error creating broadcast list:', error);
+            showToast('Error creating broadcast list', 'error');
+        } finally {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }
+    });
+
+    document.getElementById('sendBroadcastForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Sending...';
+        submitBtn.disabled = true;
+        
+        const campaignName = document.getElementById('campaignName').value;
+        const listId = document.getElementById('broadcastList').value;
+        const messageContent = document.getElementById('messageContent').value;
+        const delay = document.getElementById('sendDelay').value;
+        
+        try {
+            const response = await apiCall(`/api/whatsapp/${currentSessionId}/broadcast/send`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    listId: parseInt(listId),
+                    campaignName,
+                    messageType: 'text',
+                    messageContent,
+                    delay: parseInt(delay)
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                bootstrap.Modal.getInstance(document.getElementById('sendBroadcastModal')).hide();
+                document.getElementById('sendBroadcastForm').reset();
+                document.getElementById('selectedListInfo').innerHTML = '<p class="mb-0 text-muted">Select a list to see details</p>';
+                loadBroadcastCampaigns();
+                showToast(`Broadcast started! Sending to ${data.data.totalContacts} contacts`, 'success');
+            } else {
+                showToast(data.message || 'Failed to send broadcast', 'error');
+            }
+        } catch (error) {
+            console.error('Error sending broadcast:', error);
+            showToast('Error sending broadcast', 'error');
+        } finally {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }
+    });
+
+    // View campaign details
+    const viewCampaignDetails = async (campaignId) => {
+        try {
+            const response = await apiCall(`/api/whatsapp/${currentSessionId}/broadcast/campaigns/${campaignId}`);
+            const data = await response.json();
+            
+            if (data.success) {
+                const { campaign, statistics, messages } = data.data;
+                
+                const content = document.getElementById('campaignDetailsContent');
+                content.innerHTML = `
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h6 class="fw-bold">Campaign Information</h6>
+                            <table class="table table-sm">
+                                <tr><td class="fw-medium">Name:</td><td>${campaign.campaign_name}</td></tr>
+                                <tr><td class="fw-medium">List:</td><td>${campaign.list_name}</td></tr>
+                                <tr><td class="fw-medium">Status:</td><td><span class="badge status-${campaign.status}">${campaign.status.toUpperCase()}</span></td></tr>
+                                <tr><td class="fw-medium">Total Contacts:</td><td>${campaign.total_contacts}</td></tr>
+                                <tr><td class="fw-medium">Created:</td><td>${new Date(campaign.created_at).toLocaleString()}</td></tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="fw-bold">Message Statistics</h6>
+                            <div class="row text-center">
+                                ${statistics.map(stat => `
+                                    <div class="col-6 mb-3">
+                                        <div class="p-3 border rounded">
+                                            <div class="fs-4 fw-bold text-${getStatusColor(stat.status)}">${stat.count}</div>
+                                            <div class="small text-muted">${stat.status.toUpperCase()}</div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6 class="fw-bold">Message Content</h6>
+                        <div class="p-3 bg-light rounded">
+                            <pre class="mb-0">${campaign.message_content}</pre>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h6 class="fw-bold">Message Details (First 20)</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Contact</th>
+                                        <th>Number</th>
+                                        <th>Status</th>
+                                        <th>Sent At</th>
+                                        <th>Error</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${messages.slice(0, 20).map(msg => `
+                                        <tr>
+                                            <td>${msg.contact_name || '-'}</td>
+                                            <td>${msg.contact_number}</td>
+                                            <td><span class="badge bg-${getStatusColor(msg.status)}">${msg.status}</span></td>
+                                            <td>${msg.sent_at ? new Date(msg.sent_at).toLocaleString() : '-'}</td>
+                                            <td>${msg.error_message ? `<small class="text-danger">${msg.error_message}</small>` : '-'}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+                
+                new bootstrap.Modal(document.getElementById('campaignDetailsModal')).show();
+            }
+        } catch (error) {
+            console.error('Error loading campaign details:', error);
+            showToast('Failed to load campaign details', 'error');
+        }
+    };
+
+    const getStatusColor = (status) => {
+        switch (status) {
+            case 'sent': case 'delivered': case 'read': return 'success';
+            case 'pending': return 'warning';
+            case 'failed': return 'danger';
+            default: return 'secondary';
+        }
+    };
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        if (checkAuth()) {
+            loadSessions();
+            
+            // Initialize empty contacts list
+            renderContactsList();
+        }
+    });
+
+    // Auto-refresh campaigns every 30 seconds
+    setInterval(() => {
+        if (currentSessionId && checkAuth() && document.visibilityState === 'visible') {
+            loadBroadcastCampaigns();
+        }
+    }, 30000);
+</script>

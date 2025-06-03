@@ -1,0 +1,383 @@
+<main class="nxl-container">
+    <div class="nxl-content">
+      <!-- [ page-header ] start -->
+      <div class="page-header bg-light rounded-lg shadow-sm p-4 mb-4">
+        <div class="page-header-left d-flex align-items-center">
+          <div class="page-header-title me-3">
+            <h4 class="m-0 fw-bold text-primary">Daftar Kontak</h4>
+          </div>
+          <nav aria-label="breadcrumb">
+            <ol class="breadcrumb m-0">
+              <li class="breadcrumb-item"><a href="/" class="text-decoration-none">Home</a></li>
+              <li class="breadcrumb-item"><a href="/contact" class="text-decoration-none">Contact</a></li>
+              <li class="breadcrumb-item active" aria-current="page">List</li>
+            </ol>
+          </nav>
+        </div>
+      </div>
+      <!-- [ page-header ] end -->
+  
+      <div class="main-content">
+        <!-- Search & Filter Bar -->
+        <div class="card mb-4 shadow-sm">
+          <div class="card-body">
+            <div class="row align-items-center">
+              <div class="col-md-8">
+                <div class="input-group">
+                  <span class="input-group-text bg-white border-end-0">
+                    <i class="bi bi-search"></i>
+                  </span>
+                  <input type="text" id="search-input" class="form-control border-start-0" placeholder="Cari nama atau nomor kontak..." aria-label="Search contacts">
+                </div>
+              </div>
+              <div class="col-md-4 mt-3 mt-md-0">
+                <div class="d-flex gap-2">
+                  <button id="filter-all" class="btn btn-outline-primary active flex-grow-1">Semua</button>
+                  <button id="filter-wa" class="btn btn-outline-primary flex-grow-1">WhatsApp</button>
+                  <button id="filter-group" class="btn btn-outline-primary flex-grow-1">Grup</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+  
+        <!-- Contact Count Info -->
+        <div class="mb-3 d-flex justify-content-between align-items-center">
+          <div id="contact-count" class="text-muted">Memuat kontak...</div>
+          <div class="dropdown">
+            <button class="btn btn-sm btn-light dropdown-toggle" type="button" id="sortDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+              Urutkan
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="sortDropdown">
+              <li><a class="dropdown-item sort-option" data-sort="name-asc" href="#">Nama (A-Z)</a></li>
+              <li><a class="dropdown-item sort-option" data-sort="name-desc" href="#">Nama (Z-A)</a></li>
+            </ul>
+          </div>
+        </div>
+  
+        <!-- Contacts List -->
+        <div id="contact-list" class="row g-4">
+          <div class="col-12 text-center p-5">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Memuat kontak...</span>
+            </div>
+            <p class="mt-2 text-muted">Memuat kontak...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  
+  <style>
+    .hover-shadow {
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+      transition: all 0.3s ease;
+    }
+    
+    .hover-shadow:hover {
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+      transform: translateY(-5px);
+    }
+    
+    .card {
+      border-radius: 12px;
+      border: none;
+      overflow: hidden;
+    }
+    
+    .card-body {
+      padding: 1.5rem;
+    }
+    
+    .text-primary {
+      color: #4361ee !important;
+    }
+    
+    .contact-card {
+      position: relative;
+    }
+    
+    .contact-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+    
+    .contact-body {
+      display: flex;
+      gap: 16px;
+    }
+    
+    .contact-avatar {
+      width: 60px;
+      height: 60px;
+      background-color: #f8f9fa;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      color: #6c757d;
+      overflow: hidden;
+    }
+    
+    .contact-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    
+    .contact-info {
+      flex: 1;
+    }
+    
+    .badge {
+      font-size: 0.7rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 50px;
+    }
+    
+    .badge-wa {
+      background-color: rgba(37, 211, 102, 0.15);
+      color: #25d366;
+    }
+    
+    .badge-group {
+      background-color: rgba(67, 97, 238, 0.15);
+      color: #4361ee;
+    }
+    
+    .hidden {
+      display: none !important;
+    }
+  
+    .btn-outline-primary.active {
+      background-color: #4361ee;
+      color: white;
+    }
+  </style>
+  
+  <script>
+    const token = localStorage.getItem('token');
+    const sessionId = new URLSearchParams(window.location.search).get('id');
+    let allContacts = [];
+  
+    async function loadContacts() {
+      const container = document.getElementById('contact-list');
+      const countDisplay = document.getElementById('contact-count');
+      
+      container.innerHTML = `
+        <div class="col-12 text-center p-5">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Memuat kontak...</span>
+          </div>
+          <p class="mt-2 text-muted">Memuat kontak...</p>
+        </div>
+      `;
+      countDisplay.innerText = 'Memuat kontak...';
+  
+      try {
+        const response = await fetch(`/api/whatsapp/${sessionId}/contacts`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+  
+        const data = await response.json();
+  
+        if (!data.success) {
+          container.innerHTML = `
+            <div class="col-12">
+              <div class="alert alert-danger text-center p-4">
+                <i class="bi bi-exclamation-circle-fill me-2"></i>
+                Gagal memuat kontak
+              </div>
+            </div>
+          `;
+          countDisplay.innerText = 'Gagal memuat kontak';
+          return;
+        }
+  
+        allContacts = data.contacts;
+  
+        if (allContacts.length === 0) {
+          container.innerHTML = `
+            <div class="col-12">
+              <div class="alert alert-light text-center p-5">
+                <i class="bi bi-person-slash me-2"></i>
+                Tidak ada kontak ditemukan
+              </div>
+            </div>
+          `;
+          countDisplay.innerText = 'Tidak ada kontak ditemukan';
+          return;
+        }
+  
+        renderContacts(allContacts);
+        countDisplay.innerText = `Menampilkan ${allContacts.length} kontak`;
+  
+      } catch (error) {
+        console.error('Error saat memuat kontak:', error);
+        container.innerHTML = `
+          <div class="col-12">
+            <div class="alert alert-danger text-center p-4">
+              <i class="bi bi-exclamation-triangle-fill me-2"></i>
+              Terjadi kesalahan saat mengambil data.
+            </div>
+          </div>
+        `;
+        countDisplay.innerText = 'Terjadi kesalahan';
+      }
+    }
+  
+    function renderContacts(contacts) {
+      const container = document.getElementById('contact-list');
+      container.innerHTML = '';
+  
+      if (contacts.length === 0) {
+        container.innerHTML = `
+          <div class="col-12">
+            <div class="alert alert-light text-center p-4">
+              <i class="bi bi-search me-2"></i>
+              Tidak ada kontak yang sesuai dengan pencarian
+            </div>
+          </div>
+        `;
+        document.getElementById('contact-count').innerText = 'Tidak ada kontak yang sesuai';
+        return;
+      }
+  
+      document.getElementById('contact-count').innerText = `Menampilkan ${contacts.length} kontak`;
+  
+      contacts.forEach((contact) => {
+        const card = document.createElement('div');
+        card.className = 'col-md-6 col-lg-4';
+  
+        const initials = (contact.name || 'Tanpa Nama').split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2);
+  
+        card.innerHTML = `
+          <div class="card h-100 shadow-sm hover-shadow contact-card" 
+               data-name="${contact.name || ''}" 
+               data-number="${contact.number}" 
+               data-is-wa="${contact.isWAContact}" 
+               data-is-group="${contact.isGroup}">
+            <div class="card-body">
+              <div class="contact-header">
+                <h5 class="card-title m-0 fw-bold">${contact.name || 'Tanpa Nama'}</h5>
+                <div>
+                  ${contact.isWAContact ? '<span class="badge badge-wa"><i class="bi bi-whatsapp me-1"></i>WhatsApp</span>' : ''}
+                  ${contact.isGroup ? '<span class="badge badge-group ms-1"><i class="bi bi-people-fill me-1"></i>Grup</span>' : ''}
+                </div>
+              </div>
+              
+              <div class="contact-body">
+                <div class="contact-avatar">
+                  ${contact.profilePictureUrl 
+                    ? `<img src="${contact.profilePictureUrl}" alt="Foto Profil ${contact.name || 'Kontak'}">`
+                    : initials
+                  }
+                </div>
+                <div class="contact-info">
+                  <div class="d-flex align-items-center mb-2">
+                    <i class="bi bi-telephone-fill text-primary me-2"></i>
+                    <span class="fw-medium">${contact.number}</span>
+                  </div>
+                  
+                  <div class="d-flex mt-3">
+                    <a href="https://wa.me/${contact.number.replace(/\D/g, '')}" class="btn btn-sm btn-outline-success me-2" target="_blank">
+                      <i class="bi bi-whatsapp me-1"></i> Chat
+                    </a>
+                    <button class="btn btn-sm btn-outline-primary me-2" onclick="copyToClipboard('${contact.number}')">
+                      <i class="bi bi-clipboard me-1"></i> Salin
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+  
+        container.appendChild(card);
+      });
+    }
+  
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        alert('Nomor telah disalin ke clipboard!');
+      }).catch(err => {
+        console.error('Gagal menyalin teks: ', err);
+      });
+    }
+  
+    function filterContacts() {
+      const searchTerm = document.getElementById('search-input').value.toLowerCase();
+      const filterButtons = document.querySelectorAll('.btn-outline-primary');
+      let filterType = 'all';
+      
+      filterButtons.forEach(btn => {
+        if (btn.classList.contains('active')) {
+          filterType = btn.id.replace('filter-', '');
+        }
+      });
+      
+      const filteredContacts = allContacts.filter(contact => {
+        const nameMatch = (contact.name || '').toLowerCase().includes(searchTerm);
+        const numberMatch = contact.number.toLowerCase().includes(searchTerm);
+        const searchMatch = nameMatch || numberMatch;
+        
+        if (filterType === 'all') return searchMatch;
+        if (filterType === 'wa') return searchMatch && contact.isWAContact;
+        if (filterType === 'group') return searchMatch && contact.isGroup;
+        
+        return false;
+      });
+      
+      renderContacts(filteredContacts);
+    }
+  
+    function sortContacts(sortBy) {
+      const [field, direction] = sortBy.split('-');
+      
+      allContacts.sort((a, b) => {
+        const nameA = (a.name || 'Tanpa Nama').toLowerCase();
+        const nameB = (b.name || 'Tanpa Nama').toLowerCase();
+        
+        if (field === 'name') {
+          return direction === 'asc' 
+            ? nameA.localeCompare(nameB) 
+            : nameB.localeCompare(nameA);
+        }
+        
+        return 0;
+      });
+      
+      filterContacts();
+    }
+  
+    window.addEventListener('DOMContentLoaded', () => {
+      loadContacts();
+      
+      // Setup search
+      document.getElementById('search-input').addEventListener('input', filterContacts);
+      
+      // Setup filters
+      document.querySelectorAll('#filter-all, #filter-wa, #filter-group').forEach(btn => {
+        btn.addEventListener('click', function() {
+          document.querySelectorAll('.btn-outline-primary').forEach(b => b.classList.remove('active'));
+          this.classList.add('active');
+          filterContacts();
+        });
+      });
+      
+      // Setup sorting
+      document.querySelectorAll('.sort-option').forEach(option => {
+        option.addEventListener('click', function(e) {
+          e.preventDefault();
+          const sortBy = this.getAttribute('data-sort');
+          sortContacts(sortBy);
+          document.getElementById('sortDropdown').textContent = this.textContent;
+        });
+      });
+    });
+  </script>

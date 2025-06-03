@@ -1,0 +1,198 @@
+<main class="nxl-container">
+    <div class="nxl-content">
+      <!-- [ page-header ] start -->
+      <div class="page-header bg-light rounded-lg shadow-sm p-4 mb-4">
+        <div class="page-header-left d-flex align-items-center">
+          <div class="page-header-title me-3">
+            <h4 class="m-0 fw-bold text-primary">Contact</h4>
+          </div>
+          <nav aria-label="breadcrumb">
+            <ol class="breadcrumb m-0">
+              <li class="breadcrumb-item"><a href="/" class="text-decoration-none">Home</a></li>
+              <li class="breadcrumb-item active" aria-current="page">Contact</li>
+            </ol>
+          </nav>
+        </div>
+      </div>
+      <!-- [ page-header ] end -->
+  
+      <div class="main-content">
+        <div id="session-list" class="row g-4">
+          <div class="col-12 text-center p-5">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Memuat data...</span>
+            </div>
+            <p class="mt-2 text-muted">Memuat data...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  
+  <style>
+    .hover-shadow {
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+      transition: all 0.3s ease;
+    }
+    
+    .hover-shadow:hover {
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+      transform: translateY(-5px);
+    }
+    
+    .card {
+      border-radius: 12px;
+      border: none;
+      overflow: hidden;
+    }
+    
+    .card-body {
+      padding: 1.5rem;
+    }
+    
+    .text-primary {
+      color: #4361ee !important;
+    }
+    
+    .bg-primary-soft {
+      background-color: rgba(67, 97, 238, 0.1);
+    }
+    
+    .status-badge {
+      padding: 0.35rem 0.75rem;
+      border-radius: 50px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    
+    .badge-connected {
+      background-color: rgba(25, 135, 84, 0.15);
+      color: #198754;
+    }
+    
+    .badge-disconnected {
+      background-color: rgba(220, 53, 69, 0.15);
+      color: #dc3545;
+    }
+  </style>
+  
+  <script>
+    async function loadSessions() {
+      const token = localStorage.getItem('token');
+      const container = document.getElementById('session-list');
+      container.innerHTML = `
+        <div class="col-12 text-center p-5">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Memuat data...</span>
+          </div>
+          <p class="mt-2 text-muted">Memuat data...</p>
+        </div>
+      `;
+  
+      try {
+        const response = await fetch('http://localhost:3000/api/whatsapp/sessions', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+  
+        const data = await response.json();
+  
+        if (!data.success) {
+          container.innerHTML = `
+            <div class="col-12">
+              <div class="alert alert-danger text-center p-4">
+                <i class="bi bi-exclamation-circle-fill me-2"></i>
+                Gagal memuat session
+              </div>
+            </div>
+          `;
+          return;
+        }
+  
+        if (data.sessions.length === 0) {
+          container.innerHTML = `
+            <div class="col-12">
+              <div class="alert alert-light text-center p-5">
+                <i class="bi bi-inbox me-2"></i>
+                Tidak ada session ditemukan
+              </div>
+            </div>
+          `;
+          return;
+        }
+  
+        container.innerHTML = '';
+  
+        data.sessions.forEach((session) => {
+          const card = document.createElement('div');
+          card.className = 'col-md-6 col-lg-4';
+  
+          const createdDate = new Date(session.created_at).toLocaleDateString('id-ID', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+          });
+          
+          const createdTime = new Date(session.created_at).toLocaleTimeString('id-ID', {
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+  
+          card.innerHTML = `
+            <a href="/contact/list?id=${session.session_id}" class="text-decoration-none">
+              <div class="card h-100 hover-shadow">
+                <div class="card-body">
+                  <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="card-title fw-bold m-0">Session</h5>
+                    <span class="status-badge ${session.isConnected ? 'badge-connected' : 'badge-disconnected'}">
+                      ${session.isConnected ? 'Terhubung' : 'Belum Terhubung'}
+                    </span>
+                  </div>
+                  
+                  <div class="mb-3 p-3 bg-light rounded-3">
+                    <code class="d-block fw-bold text-dark">${session.session_id}</code>
+                  </div>
+                  
+                  <div class="mb-2">
+                    <div class="d-flex">
+                      <div class="text-muted me-2" style="width: 90px;">User ID:</div>
+                      <div class="fw-medium">${session.user_id}</div>
+                    </div>
+                  </div>
+                  
+                  <div class="mb-3">
+                    <div class="d-flex">
+                      <div class="text-muted me-2" style="width: 90px;">Deskripsi:</div>
+                      <div class="fw-medium">${session.description || '-'}</div>
+                    </div>
+                  </div>
+                  
+                  <div class="text-muted small d-flex align-items-center mt-4">
+                    <i class="bi bi-clock me-1"></i>
+                    Dibuat: ${createdDate} ${createdTime}
+                  </div>
+                </div>
+              </div>
+            </a>
+          `;
+  
+          container.appendChild(card);
+        });
+  
+      } catch (error) {
+        console.error('Error saat memuat session:', error);
+        container.innerHTML = `
+          <div class="col-12">
+            <div class="alert alert-danger text-center p-4">
+              <i class="bi bi-exclamation-triangle-fill me-2"></i>
+              Terjadi kesalahan saat mengambil data.
+            </div>
+          </div>
+        `;
+      }
+    }
+  
+    // Jalankan saat halaman dimuat
+    window.addEventListener('DOMContentLoaded', loadSessions);
+  </script>

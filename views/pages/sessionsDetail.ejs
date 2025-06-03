@@ -1,0 +1,568 @@
+<main class="nxl-container">
+  <div class="nxl-content">
+    <!-- [ page-header ] start -->
+    <div class="page-header mb-4">
+      <div class="page-header-left d-flex align-items-center">
+        <div class="page-header-title">
+          <h4 class="fw-bold text-primary mb-1">Sessions Detail</h4>
+        </div>
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb ms-3 mb-0">
+            <li class="breadcrumb-item"><a href="/" class="text-decoration-none">Home</a></li>
+            <li class="breadcrumb-item"><a href="/sessions" class="text-decoration-none">Sessions</a></li>
+            <li class="breadcrumb-item active">Detail</li>
+          </ol>
+        </nav>
+      </div>
+      <div class="page-header-right ms-auto">
+        <div class="d-flex d-md-none">
+          <a href="/sessions" class="btn btn-outline-secondary btn-sm rounded-pill">
+            <i class="bi bi-arrow-left me-2"></i>
+            <span>Back</span>
+          </a>
+        </div>
+        <div class="d-md-none d-flex align-items-center ms-3">
+          <a href="javascript:void(0)" class="page-header-right-open-toggle">
+            <i class="bi bi-list fs-4"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+    <!-- [ page-header ] end -->
+
+    <div class="main-content">
+      <div class="row g-4">
+        <!-- Info Card -->
+        <div class="col-lg-6">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white pt-4 pb-3 border-0">
+              <div class="d-flex align-items-center">
+                <i class="bi bi-info-circle-fill text-primary fs-4 me-2"></i>
+                <h5 class="card-title fw-bold mb-0">Informasi Session</h5>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="info-item mb-3 pb-3 border-bottom">
+                <label class="text-muted mb-1">Session ID</label>
+                <div class="d-flex align-items-center">
+                  <i class="bi bi-hash text-primary me-2"></i>
+                  <span id="sessionIdText" class="fw-bold">-</span>
+                </div>
+              </div>
+              
+              <div class="info-item mb-3 pb-3 border-bottom">
+                <label class="text-muted mb-1">Status Koneksi</label>
+                <div class="d-flex align-items-center">
+                  <i id="statusIcon" class="bi bi-question-circle me-2"></i>
+                  <span id="statusText" class="text-muted fw-bold">Memuat...</span>
+                </div>
+              </div>
+              
+              <div class="info-item mb-4">
+                <label class="text-muted mb-1">Deskripsi</label>
+                <div class="d-flex align-items-center">
+                  <i class="bi bi-card-text text-primary me-2"></i>
+                  <span id="descriptionText" class="fw-bold">-</span>
+                </div>
+              </div>
+
+              <div class="mt-4">
+                <label for="updateDescription" class="form-label fw-medium">Ubah Deskripsi</label>
+                <div class="input-group">
+                  <span class="input-group-text bg-white border-end-0">
+                    <i class="bi bi-pencil-fill text-primary"></i>
+                  </span>
+                  <input type="text" id="updateDescription" class="form-control border-start-0" placeholder="Deskripsi baru...">
+                  <button class="btn btn-primary" onclick="updateDescription()">
+                    <i class="bi bi-check2 me-1"></i> Update
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- QR Code Card -->
+        <div class="col-lg-6">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white pt-4 pb-3 border-0">
+              <div class="d-flex align-items-center">
+                <i class="bi bi-qr-code text-primary fs-4 me-2"></i>
+                <h5 class="card-title fw-bold mb-0">QR Code</h5>
+              </div>
+            </div>
+            <div class="card-body text-center">
+              <div id="qrCodeContainer" class="my-4 py-3">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-3 text-muted">Menunggu QR Code...</p>
+              </div>
+              <button class="btn btn-outline-primary rounded-pill" onclick="refreshQrCode()">
+                <i class="bi bi-arrow-clockwise me-2"></i>Refresh QR
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Kirim Pesan -->
+        <div class="col-12">
+          <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white pt-4 pb-3 border-0">
+              <div class="d-flex align-items-center">
+                <i class="bi bi-chat-dots-fill text-primary fs-4 me-2"></i>
+                <h5 class="card-title fw-bold mb-0">Kirim Pesan Test</h5>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-lg-4 mb-3">
+                  <label for="targetNumber" class="form-label fw-medium">Nomor Tujuan</label>
+                  <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0">
+                      <i class="bi bi-phone-fill text-primary"></i>
+                    </span>
+                    <input type="text" id="targetNumber" class="form-control border-start-0" placeholder="628xxxxxxxxxx">
+                  </div>
+                </div>
+                <div class="col-lg-8 mb-3">
+                  <label for="targetMessage" class="form-label fw-medium">Pesan</label>
+                  <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0">
+                      <i class="bi bi-chat-text-fill text-primary"></i>
+                    </span>
+                    <textarea id="targetMessage" class="form-control border-start-0" rows="2" placeholder="Ketik pesan disini..."></textarea>
+                  </div>
+                </div>
+                <div class="col-12">
+                  <button class="btn btn-success px-4" onclick="sendTestMessage()">
+                    <i class="bi bi-send-fill me-2"></i>Kirim Pesan
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="col-12 mb-4">
+          <div class="card border-0 shadow-sm bg-light">
+            <div class="card-body p-4">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <h6 class="fw-bold mb-1">Tindakan</h6>
+                  <p class="text-muted mb-0 small">Hapus session jika tidak digunakan</p>
+                </div>
+                <button class="btn btn-danger" onclick="deleteSession()">
+                  <i class="bi bi-trash-fill me-2"></i>Hapus Session
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<style>
+  .card {
+    border-radius: 12px;
+    transition: all 0.3s ease;
+  }
+  
+  .btn {
+    border-radius: 6px;
+    padding: 0.5rem 1.25rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+  }
+  
+  .btn-primary {
+    background: linear-gradient(45deg, #4a6bff, #657eff);
+    border: none;
+    box-shadow: 0 4px 12px rgba(74, 107, 255, 0.2);
+  }
+  
+  .btn-primary:hover {
+    background: linear-gradient(45deg, #3955d8, #4a6bff);
+    box-shadow: 0 6px 16px rgba(74, 107, 255, 0.3);
+    transform: translateY(-2px);
+  }
+  
+  .btn-success {
+    background: linear-gradient(45deg, #28a745, #5cb85c);
+    border: none;
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.2);
+  }
+  
+  .btn-success:hover {
+    background: linear-gradient(45deg, #218838, #28a745);
+    box-shadow: 0 6px 16px rgba(40, 167, 69, 0.3);
+    transform: translateY(-2px);
+  }
+  
+  .btn-danger {
+    background: linear-gradient(45deg, #dc3545, #ef5350);
+    border: none;
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.2);
+  }
+  
+  .btn-danger:hover {
+    background: linear-gradient(45deg, #c82333, #dc3545);
+    box-shadow: 0 6px 16px rgba(220, 53, 69, 0.3);
+    transform: translateY(-2px);
+  }
+  
+  .text-primary {
+    color: #4a6bff !important;
+  }
+  
+  #qrCodeContainer img {
+    border: 1px solid #eee;
+    padding: 10px;
+    border-radius: 12px;
+    max-width: 100%;
+    height: auto;
+  }
+  
+  .info-item label {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+</style>
+
+<script>
+  const token = localStorage.getItem('token');
+  const sessionId = new URLSearchParams(window.location.search).get('id');
+
+  document.getElementById('sessionIdText').textContent = sessionId;
+
+  let isConnected = false;
+
+  // Toast function for notifications
+  function showToast(message, type = 'info') {
+    // Create toast container if it doesn't exist
+    let toastContainer = document.querySelector('.toast-container');
+    if (!toastContainer) {
+      toastContainer = document.createElement('div');
+      toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+      document.body.appendChild(toastContainer);
+    }
+    
+    // Determine color based on type
+    let bgColor = 'bg-primary';
+    let icon = 'bi-info-circle-fill';
+    
+    if (type === 'success') {
+      bgColor = 'bg-success';
+      icon = 'bi-check-circle-fill';
+    } else if (type === 'warning') {
+      bgColor = 'bg-warning text-dark';
+      icon = 'bi-exclamation-triangle-fill';
+    } else if (type === 'error') {
+      bgColor = 'bg-danger';
+      icon = 'bi-x-circle-fill';
+    }
+    
+    // Create toast element
+    const toastEl = document.createElement('div');
+    toastEl.className = `toast ${bgColor} text-white`;
+    toastEl.setAttribute('role', 'alert');
+    toastEl.setAttribute('aria-live', 'assertive');
+    toastEl.setAttribute('aria-atomic', 'true');
+    
+    toastEl.innerHTML = `
+      <div class="toast-header">
+        <i class="bi ${icon} me-2"></i>
+        <strong class="me-auto">${type.charAt(0).toUpperCase() + type.slice(1)}</strong>
+        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+      <div class="toast-body">
+        ${message}
+      </div>
+    `;
+    
+    toastContainer.appendChild(toastEl);
+    
+    // Use Bootstrap Toast API
+    const toast = new bootstrap.Toast(toastEl);
+    toast.show();
+    
+    // Remove toast after it's hidden
+    toastEl.addEventListener('hidden.bs.toast', function() {
+      toastEl.remove();
+    });
+  }
+
+  async function getStatus() {
+    try {
+      const res = await fetch(`/api/whatsapp/session/${sessionId}/status`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      isConnected = data.isConnected;
+
+      const status = isConnected ? 'Terhubung' : 'Belum Terhubung';
+      const color = isConnected ? 'text-success' : 'text-danger';
+      const icon = isConnected ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger';
+      
+      document.getElementById('statusText').textContent = status;
+      document.getElementById('statusText').className = color + ' fw-bold';
+      document.getElementById('statusIcon').className = icon + ' me-2';
+
+      if (!isConnected) {
+        await getQrCode(); // hanya ambil QR jika belum connect
+      } else {
+        document.getElementById('qrCodeContainer').innerHTML = `
+          <div class="text-success p-4">
+            <i class="bi bi-check-circle-fill fs-1"></i>
+            <h5 class="mt-3">Sudah Terhubung</h5>
+            <p class="text-muted">WhatsApp berhasil terhubung</p>
+          </div>`;
+      }
+
+    } catch (err) {
+      document.getElementById('statusText').textContent = 'Gagal cek status';
+      document.getElementById('statusText').className = 'text-warning fw-bold';
+      document.getElementById('statusIcon').className = 'bi-exclamation-circle-fill text-warning me-2';
+      showToast('Gagal memeriksa status koneksi', 'error');
+    }
+  }
+
+  async function getQrCode() {
+    document.getElementById('qrCodeContainer').innerHTML = `
+      <div class="spinner-border text-primary" role="status"></div>
+      <p class="mt-3 text-muted">Memuat QR Code...</p>
+    `;
+    
+    try {
+      const res = await fetch(`/api/whatsapp/session/${sessionId}/qrcode`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        const qr = data.qrCode;
+        const qrImg = `
+          <div class="qr-wrapper p-3 border rounded shadow-sm">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qr)}" alt="QR Code">
+            <p class="mt-3 text-muted mb-0">Scan QR code dengan WhatsApp di ponsel Anda</p>
+          </div>`;
+        document.getElementById('qrCodeContainer').innerHTML = qrImg;
+      } else {
+        document.getElementById('qrCodeContainer').innerHTML = `
+          <div class="text-muted p-4">
+            <i class="bi bi-qr-code fs-1"></i>
+            <h5 class="mt-3">QR Code belum tersedia</h5>
+            <p class="text-muted">Silakan coba refresh</p>
+          </div>`;
+        showToast('QR Code belum tersedia', 'warning');
+      }
+    } catch (err) {
+      document.getElementById('qrCodeContainer').innerHTML = `
+        <div class="text-danger p-4">
+          <i class="bi bi-exclamation-circle-fill fs-1"></i>
+          <h5 class="mt-3">Gagal memuat QR Code</h5>
+          <p class="text-muted">Silakan coba refresh</p>
+        </div>`;
+      showToast('Gagal memuat QR Code', 'error');
+    }
+  }
+
+  function refreshQrCode() {
+    if (!isConnected) {
+      getQrCode();
+      showToast('Menyegarkan QR Code', 'info');
+    } else {
+      showToast('Session sudah terhubung. Tidak perlu scan ulang.', 'warning');
+    }
+  }
+
+  async function updateDescription() {
+    const updateBtn = document.querySelector('button[onclick="updateDescription()"]');
+    const originalText = updateBtn.innerHTML;
+    updateBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Updating...';
+    updateBtn.disabled = true;
+    
+    const newDesc = document.getElementById('updateDescription').value;
+    
+    if (!newDesc.trim()) {
+      showToast('Deskripsi tidak boleh kosong', 'warning');
+      updateBtn.innerHTML = originalText;
+      updateBtn.disabled = false;
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/api/whatsapp/session/${sessionId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ description: newDesc })
+      });
+      
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById('descriptionText').textContent = data.session.description;
+        document.getElementById('updateDescription').value = '';
+        showToast('Deskripsi berhasil diperbarui', 'success');
+      } else {
+        showToast('Gagal update deskripsi: ' + (data.message || 'Unknown error'), 'error');
+      }
+    } catch (err) {
+      showToast('Terjadi kesalahan saat memperbarui deskripsi', 'error');
+    } finally {
+      updateBtn.innerHTML = originalText;
+      updateBtn.disabled = false;
+    }
+  }
+
+  async function deleteSession() {
+    // Use Bootstrap modal if available, otherwise fallback to confirm
+    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+      // Check if modal already exists
+      let confirmModal = document.getElementById('deleteConfirmModal');
+      if (!confirmModal) {
+        // Create modal
+        confirmModal = document.createElement('div');
+        confirmModal.className = 'modal fade';
+        confirmModal.id = 'deleteConfirmModal';
+        confirmModal.tabIndex = '-1';
+        confirmModal.setAttribute('aria-hidden', 'true');
+        
+        confirmModal.innerHTML = `
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">Konfirmasi Hapus</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <p>Apakah Anda yakin ingin menghapus session ini?</p>
+                <p class="text-muted small">Tindakan ini tidak dapat dibatalkan.</p>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                  <i class="bi bi-trash-fill me-2"></i>Hapus Session
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+        
+        document.body.appendChild(confirmModal);
+        
+        // Add event listener to the confirm button
+        document.getElementById('confirmDeleteBtn').addEventListener('click', async function() {
+          const modal = bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal'));
+          modal.hide();
+          
+          // Show loading state
+          this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Menghapus...';
+          this.disabled = true;
+          
+          await performDelete();
+        });
+      }
+      
+      // Show modal
+      const modal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+      modal.show();
+    } else {
+      // Fallback to confirm
+      if (confirm('Yakin hapus session ini?')) {
+        await performDelete();
+      }
+    }
+  }
+
+  async function performDelete() {
+    try {
+      const res = await fetch(`/api/whatsapp/session/${sessionId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      const data = await res.json();
+      if (data.success) {
+        showToast('Session berhasil dihapus', 'success');
+        setTimeout(() => {
+          window.location.href = '/sessions';
+        }, 1500);
+      } else {
+        showToast('Gagal hapus session: ' + (data.message || 'Unknown error'), 'error');
+      }
+    } catch (err) {
+      showToast('Terjadi kesalahan saat menghapus session', 'error');
+    }
+  }
+
+  async function sendTestMessage() {
+    const number = document.getElementById('targetNumber').value;
+    const message = document.getElementById('targetMessage').value;
+    
+    if (!number.trim()) {
+      showToast('Nomor tujuan tidak boleh kosong', 'warning');
+      return;
+    }
+    
+    if (!message.trim()) {
+      showToast('Pesan tidak boleh kosong', 'warning');
+      return;
+    }
+    
+    const sendBtn = document.querySelector('button[onclick="sendTestMessage()"]');
+    const originalText = sendBtn.innerHTML;
+    sendBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Mengirim...';
+    sendBtn.disabled = true;
+    
+    try {
+      const res = await fetch(`/api/whatsapp/session/${sessionId}/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ number, message })
+      });
+    
+      const data = await res.json();
+      if (data.success) {
+        showToast('Pesan berhasil dikirim!', 'success');
+        document.getElementById('targetMessage').value = '';
+      } else {
+        showToast(data.message || 'Gagal mengirim pesan', 'error');
+      }
+    } catch (err) {
+      showToast('Terjadi kesalahan saat mengirim pesan', 'error');
+    } finally {
+      sendBtn.innerHTML = originalText;
+      sendBtn.disabled = false;
+    }
+  }
+
+  // Inisialisasi saat halaman dibuka
+  document.addEventListener('DOMContentLoaded', function() {
+    // Fetch session details
+    (async function() {
+      try {
+        const res = await fetch(`/api/whatsapp/session/${sessionId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+        
+        if (data.success && data.session) {
+          document.getElementById('descriptionText').textContent = data.session.description || '-';
+        }
+      } catch (err) {
+        console.error('Error fetching session details:', err);
+      }
+    })();
+    
+    // Check status and get QR if needed
+    getStatus();
+  });
+</script>
