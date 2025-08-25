@@ -42,7 +42,9 @@
                     <div class="row">
                         <div class="col-md-6">
                             <h6>Base URL</h6>
-                            <code class="bg-light p-2 rounded d-block">http://localhost:3000/api</code>
+                            <p class="text-muted mb-2">Dynamic base URL automatically detected from current domain:</p>
+                            <code class="bg-light p-2 rounded d-block" id="dynamicBaseUrl">Loading...</code>
+                            <small class="text-muted">No need to manually change URLs when deploying!</small>
                         </div>
                         <div class="col-md-6">
                             <h6>Authentication</h6>
@@ -841,5 +843,19 @@ format: "number,name"</code></pre>
                 });
             });
         });
+
+        // Update dynamic base URL display
+        if (window.AppConfig) {
+            document.getElementById('dynamicBaseUrl').textContent = window.AppConfig.apiBaseUrl;
+        } else {
+            // Fallback if config not loaded
+            setTimeout(() => {
+                if (window.AppConfig) {
+                    document.getElementById('dynamicBaseUrl').textContent = window.AppConfig.apiBaseUrl;
+                } else {
+                    document.getElementById('dynamicBaseUrl').textContent = 'Configuration not loaded';
+                }
+            }, 1000);
+        }
     });
 </script>

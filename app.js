@@ -60,6 +60,9 @@ app.set('views', path.join(__dirname, 'views'));
 // Aset statis (gambar, css, js)
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
 
+// Serve frontend configuration
+app.use('/config', express.static(path.join(__dirname, 'config')));
+
 
 
 // Direktori untuk menyimpan sesi

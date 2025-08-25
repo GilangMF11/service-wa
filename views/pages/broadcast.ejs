@@ -779,7 +779,12 @@
             headers['Authorization'] = `Bearer ${token}`;
         }
 
-        const response = await fetch(url, {
+        // Use dynamic base URL if available, otherwise fallback to relative URL
+        const fullUrl = window.AppConfig && window.AppConfig.apiBaseUrl 
+            ? `${window.AppConfig.apiBaseUrl}${url.startsWith('/') ? url : `/${url}`}`
+            : url;
+
+        const response = await fetch(fullUrl, {
             ...options,
             headers
         });

@@ -331,7 +331,11 @@
 
                 // Load sessions (gunakan endpoint yang sama dengan sessions view)
                 console.log('📱 Loading sessions...');
-                const sessionsResponse = await fetch('/api/whatsapp/sessions', {
+                const sessionsUrl = window.AppConfig && window.AppConfig.apiBaseUrl 
+                    ? `${window.AppConfig.apiBaseUrl}/whatsapp/sessions`
+                    : '/api/whatsapp/sessions';
+                    
+                const sessionsResponse = await fetch(sessionsUrl, {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
@@ -345,7 +349,11 @@
 
                 // Load broadcast lists
                 console.log('📋 Loading broadcast lists...');
-                const broadcastResponse = await fetch('/api/dashboard/lists', {
+                const listsUrl = window.AppConfig && window.AppConfig.apiBaseUrl 
+                    ? `${window.AppConfig.apiBaseUrl}/dashboard/lists`
+                    : '/api/dashboard/lists';
+                    
+                const broadcastResponse = await fetch(listsUrl, {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
@@ -358,7 +366,11 @@
 
                 // Load campaigns
                 console.log('📤 Loading campaigns...');
-                const campaignsResponse = await fetch('/api/dashboard/campaigns', {
+                const campaignsUrl = window.AppConfig && window.AppConfig.apiBaseUrl 
+                    ? `${window.AppConfig.apiBaseUrl}/dashboard/campaigns`
+                    : '/api/dashboard/campaigns';
+                    
+                const campaignsResponse = await fetch(campaignsUrl, {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }

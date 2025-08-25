@@ -102,7 +102,11 @@
     `;
 
     try {
-      const response = await fetch('http://localhost:3000/api/whatsapp/sessions', {
+      const sessionsUrl = window.AppConfig && window.AppConfig.apiBaseUrl 
+        ? `${window.AppConfig.apiBaseUrl}/whatsapp/sessions`
+        : '/api/whatsapp/sessions';
+        
+      const response = await fetch(sessionsUrl, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -214,7 +218,11 @@
       btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Membuat...';
       btn.disabled = true;
       
-      const res = await fetch('http://localhost:3000/api/whatsapp/session', {
+      const createSessionUrl = window.AppConfig && window.AppConfig.apiBaseUrl 
+        ? `${window.AppConfig.apiBaseUrl}/whatsapp/session`
+        : '/api/whatsapp/session';
+        
+      const res = await fetch(createSessionUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
