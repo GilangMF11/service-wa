@@ -32,8 +32,8 @@ const broadcastMiddleware = {
                 });
             }
 
-            // Add session info to request
-            req.session = session;
+            // Add session info to request (gunakan nama yang berbeda untuk menghindari konflik)
+            req.whatsappSession = session;
             next();
         } catch (error) {
             console.error('Error validating session:', error);

@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const ejs = require('ejs');
+const { requireAuth, preventAuthAccess } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
@@ -28,16 +29,18 @@ const renderPage = (res, pageName, title = 'Untitled') => {
 router.get('/', (req, res) => {
   res.redirect('/auth/login');
 });
-router.get('/dashboard', (req, res) => renderPage(res, 'dashboard', 'Dashboard'));
-router.get('/broadcast', (req, res) => renderPage(res, 'broadcast', 'Broadcast'));
-router.get('/documentation', (req, res) => renderPage(res, 'documentation', 'Documentation'));
-router.get('/sessions', (req, res) => renderPage(res, 'sessions', 'Session'));
-router.get('/sessions/detail', (req, res) => renderPage(res, 'sessionsDetail', 'Session Detail'));
-router.get('/users', (req, res) => renderPage(res, 'users', 'User'));
-router.get('/chats', (req, res) => renderPage(res, 'chats', 'Chat'));
-router.get('/chats/list', (req, res) => renderPage(res, 'chatsList', 'Chat List'));
-router.get('/contact', (req, res) => renderPage(res, 'contact', 'Contact'));
-router.get('/contact/list', (req, res) => renderPage(res, 'contactList', 'Contact List'));
+
+// Protected routes - require authentication
+router.get('/dashboard', requireAuth, (req, res) => renderPage(res, 'dashboard', 'Dashboard'));
+router.get('/broadcast', requireAuth, (req, res) => renderPage(res, 'broadcast', 'Broadcast'));
+router.get('/documentation', requireAuth, (req, res) => renderPage(res, 'documentation', 'Documentation'));
+router.get('/sessions', requireAuth, (req, res) => renderPage(res, 'sessions', 'Session'));
+router.get('/sessions/detail', requireAuth, (req, res) => renderPage(res, 'sessionsDetail', 'Session Detail'));
+router.get('/users', requireAuth, (req, res) => renderPage(res, 'users', 'User'));
+router.get('/chats', requireAuth, (req, res) => renderPage(res, 'chats', 'Chat'));
+router.get('/chats/list', requireAuth, (req, res) => renderPage(res, 'chatsList', 'Chat List'));
+router.get('/contact', requireAuth, (req, res) => renderPage(res, 'contact', 'Contact'));
+router.get('/contact/list', requireAuth, (req, res) => renderPage(res, 'contactList', 'Contact List'));
 
 // Fallback 404
 router.use((req, res) => {

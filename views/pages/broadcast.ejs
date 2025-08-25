@@ -88,7 +88,7 @@
                                     <button class="btn btn-sm btn-outline-primary me-2" onclick="refreshContactCounts()" title="Refresh contact counts">
                                         <i class="bi bi-arrow-clockwise"></i>
                                     </button>
-                                    <div class="badge bg-primary rounded-pill" id="totalListsText">0 lists</div>
+                                <div class="badge bg-primary rounded-pill" id="totalListsText">0 lists</div>
                                 </div>
                             </div>
                         </div>
@@ -1758,11 +1758,11 @@
             }
             
             submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Sending...';
-            
-            const campaignName = document.getElementById('campaignName').value;
-            const listId = document.getElementById('broadcastList').value;
-            const messageContent = document.getElementById('messageContent').value;
-            const delay = document.getElementById('sendDelay').value;
+        
+        const campaignName = document.getElementById('campaignName').value;
+        const listId = document.getElementById('broadcastList').value;
+        const messageContent = document.getElementById('messageContent').value;
+        const delay = document.getElementById('sendDelay').value;
             const response = await apiCall(`/api/whatsapp/${currentSessionId}/broadcast/send`, {
                 method: 'POST',
                 body: JSON.stringify({
@@ -1895,6 +1895,7 @@
             // Add modal close event listeners
             document.getElementById('editListModal').addEventListener('hidden.bs.modal', () => {
                 // Clear form and sections when modal is closed
+                contactsToAdd = [];
                 document.getElementById('editListForm').reset();
                 document.getElementById('addContactsSection').style.display = 'none';
                 document.getElementById('removeContactsSection').style.display = 'none';
@@ -2080,11 +2081,7 @@
         document.getElementById('editContactsTextarea').value = '';
     };
 
-    // Reset edit modal when closed
-    document.getElementById('editListModal').addEventListener('hidden.bs.modal', () => {
-        contactsToAdd = [];
-        document.getElementById('editContactsList').innerHTML = '';
-    });
+
 
     // Reset view contacts modal when closed
     document.getElementById('viewContactsModal').addEventListener('hidden.bs.modal', () => {
@@ -2241,7 +2238,7 @@
             }
 
             // Get contacts to add from the global contactsToAdd array
-            const contactsToAdd = contactsToAdd || [];
+            const contactsToAddArray = contactsToAdd || [];
 
             // Get contacts to remove
             const contactsToRemove = [];
@@ -2252,7 +2249,7 @@
 
             // Show confirmation with summary
             const summary = [];
-            if (contactsToAdd.length > 0) summary.push(`Add ${contactsToAdd.length} new contacts`);
+            if (contactsToAddArray.length > 0) summary.push(`Add ${contactsToAddArray.length} new contacts`);
             if (contactsToRemove.length > 0) summary.push(`Remove ${contactsToRemove.length} contacts`);
             
             // Check if list details changed
@@ -2288,10 +2285,10 @@
             }
 
             // Add new contacts if any
-            if (contactsToAdd.length > 0) {
+            if (contactsToAddArray.length > 0) {
                 const addResponse = await apiCall(`/api/whatsapp/${currentSessionId}/broadcast/lists/${listId}/contacts`, {
                     method: 'POST',
-                    body: JSON.stringify({ contacts: contactsToAdd })
+                    body: JSON.stringify({ contacts: contactsToAddArray })
                 });
 
                 const addData = await addResponse.json();

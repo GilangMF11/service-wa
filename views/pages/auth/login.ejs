@@ -50,7 +50,7 @@
                     <h2 class="fs-20 fw-bolder mb-4">Login</h2>
                     <form id="loginForm" class="w-100 mt-4 pt-2">
                         <div class="mb-4">
-                            <input type="text" class="form-control" id="username" placeholder="Username"  required>
+                            <input type="text" class="form-control" id="username" placeholder="Username" required>
                         </div>
                         <div class="mb-3">
                             <input type="password" class="form-control" id="password" placeholder="Password" required>
@@ -239,38 +239,121 @@
     <!--! END: Theme Customizer !-->
 
     <script>
+        // Check if user is already logged in
+        const token = localStorage.getItem('token');
+        if (token) {
+            // Validate token before redirect
+            try {
+                // Simple token validation - check if it's not empty and has valid format
+                if (token && token.length > 10) {
+                    console.log('Token found, redirecting to dashboard...');
+                    window.location.replace('/dashboard');
+                } else {
+                    // Invalid token, remove it
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                }
+            } catch (error) {
+                console.error('Error validating token:', error);
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+            }
+        }
+
+        // Toast function for notifications
+        function showToast(message, type = 'info') {
+            let toastContainer = document.querySelector('.toast-container');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+                document.body.appendChild(toastContainer);
+            }
+            
+            let bgColor = 'bg-primary';
+            let icon = 'bi-info-circle-fill';
+            
+            if (type === 'success') {
+                bgColor = 'bg-success';
+                icon = 'bi-check-circle-fill';
+            } else if (type === 'warning') {
+                bgColor = 'bg-warning text-dark';
+                icon = 'bi-exclamation-triangle-fill';
+            } else if (type === 'error') {
+                bgColor = 'bg-danger';
+                icon = 'bi-x-circle-fill';
+            }
+            
+            const toastEl = document.createElement('div');
+            toastEl.className = `toast ${bgColor} text-white border-0 shadow`;
+            toastEl.innerHTML = `
+                <div class="toast-body d-flex align-items-center">
+                    <i class="bi ${icon} me-2 fs-5"></i>
+                    <span>${message}</span>
+                    <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="toast"></button>
+                </div>
+            `;
+            
+            toastContainer.appendChild(toastEl);
+            const toast = new bootstrap.Toast(toastEl);
+            toast.show();
+            
+            toastEl.addEventListener('hidden.bs.toast', function() {
+                toastEl.remove();
+            });
+        }
+
         document.getElementById('loginForm').addEventListener('submit', async function (e) {
-          e.preventDefault();
-      
-          const username = document.getElementById('username').value;
-          const password = document.getElementById('password').value;
-      
-          const response = await fetch('http://localhost:3000/auth/login', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({ username, password })
-});
+            e.preventDefault();
+            
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Logging in...';
+            submitBtn.disabled = true;
+            
+            try {
+                const username = document.getElementById('username').value.trim();
+                const password = document.getElementById('password').value;
+                
+                // Basic validation
+                if (!username || !password) {
+                    showToast('Username dan password diperlukan', 'warning');
+                    return;
+                }
+                
+                const response = await fetch('/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
 
-// DEBUG
-        const text = await response.text();
-        console.log('Isi response:', text);
-
-        try {
-        const data = JSON.parse(text); // parse manual untuk lihat error jelas
-        if (data.success) {
-            localStorage.setItem('token', data.token);
-            window.location.href = '/dashboard';
-        } else {
-            alert('Login gagal: ' + data.message);
-        }
-        } catch (err) {
-        alert('Respons bukan JSON. Mungkin error HTML dari server.');
-        }
-
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Store token
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    
+                    showToast('Login berhasil!', 'success');
+                    
+                    // Redirect to dashboard using replace to prevent back button issues
+                    setTimeout(() => {
+                        window.location.replace('/dashboard');
+                    }, 1000);
+                } else {
+                    showToast(data.message || 'Login gagal', 'error');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showToast('Terjadi kesalahan saat login', 'error');
+            } finally {
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            }
         });
-      </script>
+    </script>
       
 </body>
 

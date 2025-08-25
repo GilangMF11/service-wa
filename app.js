@@ -12,13 +12,16 @@ const clients = require('./clients');
 
 // Import modul
 const { testConnection, initDatabase, whatsappSessionQueries } = require('./db');
-const { authenticateToken, registerUser, loginUser } = require('./auth');
+const { registerUser, loginUser } = require('./auth');
+const { verifyToken } = require('./middleware/authMiddleware');
 
 // Tambahkan di bagian atas setelah import routes yang sudah ada
 const contactRoutes = require('./routes/api/contactRoutes');
 const chatRoutes = require('./routes/api/chatRoutes');
 const userRoutes = require('./routes/api/userRoutes');
 const broadcastRoutes = require('./routes/api/broadcastRoutes');
+const sessionRoutes = require('./routes/api/sessionRoutes');
+const dashboardRoutes = require('./routes/api/dashboardRoutes');
 
 const { config, validateConfig } = require('./config/config');
 
@@ -28,6 +31,19 @@ validateConfig();
 // Inisialisasi Express
 const app = express();
 app.use(express.json());
+
+// Session middleware
+const session = require('express-session');
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'whatsapp-api-session-secret',
+    resave: false,
+    saveUninitialized: true, // Ubah ke true untuk mencegah error
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
+}));
+
 const port = process.env.PORT || 3000;
 
 const http = require('http').createServer(app);
@@ -344,11 +360,37 @@ app.get('/health', (req, res) => {
 // Rute untuk autentikasi
 app.post('/auth/register', registerUser);
 app.post('/auth/login', loginUser);
+app.get('/auth/logout', (req, res) => {
+    // Destroy session
+    if (req.session) {
+        req.session.destroy((err) => {
+            if (err) {
+                console.error('Error destroying session:', err);
+            }
+        });
+    }
+    
+    // Return response berdasarkan request type
+    if (req.xhr || req.headers.accept?.includes('application/json')) {
+        // API call
+        return res.json({
+            success: true,
+            message: 'Logout berhasil'
+        });
+    } else {
+        // Web page
+        res.redirect('/auth/login');
+    }
+});
+
+// Routes yang tidak memerlukan autentikasi (untuk dashboard)
+app.use('/api/sessions', sessionRoutes);
 
 // Rute WhatsApp API yang memerlukan autentikasi
-app.use('/api', authenticateToken);
+app.use('/api', verifyToken);
 
 app.use('/api/users', userRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Routes untuk broadcast (dengan feature flag check)
 if (config.features.enableBroadcast) {
@@ -874,12 +916,18 @@ const loadAllSessions = async () => {
                 await new Promise(resolve => setTimeout(resolve, 1000));
             } catch (error) {
                 console.error(`Failed to load session ${session.session_id}:`, error.message);
+                // Continue with next session even if one fails
             }
         }
         
         console.log(`✅ Berhasil memuat ${loadedCount}/${sessions.length} client WhatsApp`);
+        
+        // Return success even if some sessions failed to load
+        return true;
     } catch (error) {
         console.error('Error saat memuat session dari database:', error);
+        // Return false but don't throw to prevent app from crashing
+        return false;
     }
 };
 
@@ -951,8 +999,10 @@ const initializeApp = async () => {
         // Inisialisasi tabel
         await initDatabase();
         
-        // Load existing sessions
-        await loadAllSessions();
+        // Load existing sessions (don't await to prevent blocking)
+        loadAllSessions().catch(error => {
+            console.error('Error loading sessions (non-blocking):', error);
+        });
         
         // Start server
         http.listen(port, () => {

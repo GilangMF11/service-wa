@@ -1284,6 +1284,47 @@ const broadcastQueries = {
         const params = userId ? [campaignId, userId] : [campaignId];
         const result = await pool.query(query, params);
         return result.rows[0];
+    },
+
+    // Get all campaigns for dashboard (without user/session filtering)
+    getAllCampaigns: async () => {
+        const query = `
+            SELECT 
+                bc.id,
+                bc.campaign_name as name,
+                bc.status,
+                bc.created_at,
+                bc.sent_count,
+                bc.failed_count,
+                bl.name as list_name
+            FROM broadcast_campaigns bc
+            LEFT JOIN broadcast_lists bl ON bc.broadcast_list_id = bl.id
+            ORDER BY bc.created_at DESC
+        `;
+        
+        const result = await pool.query(query);
+        return result.rows;
+    },
+
+    // Get all broadcast lists for dashboard (without user/session filtering)
+    getAllBroadcastLists: async () => {
+        const query = `
+            SELECT 
+                bl.id,
+                bl.name,
+                bl.description,
+                bl.created_at,
+                bl.is_active,
+                COUNT(bc.id) as contact_count
+            FROM broadcast_lists bl
+            LEFT JOIN broadcast_contacts bc ON bl.id = bc.broadcast_list_id AND bc.is_active = true
+            WHERE bl.is_active = true
+            GROUP BY bl.id
+            ORDER BY bl.created_at DESC
+        `;
+        
+        const result = await pool.query(query);
+        return result.rows;
     }
 
 
