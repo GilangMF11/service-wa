@@ -490,12 +490,17 @@ const broadcastQueries = {
     addMultipleContactsToBroadcastList: async (listId, contacts) => {
         if (!contacts || contacts.length === 0) return [];
 
-        const values = contacts.map((_, index) =>
+        // Remove duplicates based on contact number
+        const uniqueContacts = contacts.filter((contact, index, self) => 
+            index === self.findIndex(c => c.number === contact.number)
+        );
+
+        const values = uniqueContacts.map((_, index) =>
             `($1, $${index * 2 + 2}, $${index * 2 + 3})`
         ).join(', ');
 
         const params = [listId];
-        contacts.forEach(contact => {
+        uniqueContacts.forEach(contact => {
             params.push(contact.number, contact.name);
         });
 
@@ -513,9 +518,11 @@ const broadcastQueries = {
     // Get contacts in broadcast list
     getContactsInBroadcastList: async (listId, limit = 50, offset = 0) => {
         const query = `
-            SELECT * FROM broadcast_contacts 
+            SELECT DISTINCT ON (contact_number) 
+                id, broadcast_list_id, contact_number, contact_name, created_at, updated_at
+            FROM broadcast_contacts 
             WHERE broadcast_list_id = $1 AND is_active = true
-            ORDER BY contact_name ASC, contact_number ASC
+            ORDER BY contact_number, created_at DESC
             LIMIT $2 OFFSET $3
         `;
         const result = await pool.query(query, [listId, limit, offset]);
@@ -531,6 +538,22 @@ const broadcastQueries = {
         `;
         const result = await pool.query(query, [listId, contactNumber]);
         return result.rowCount > 0;
+    },
+
+    // Clean duplicate contacts in broadcast list
+    cleanDuplicateContacts: async (listId) => {
+        const query = `
+            DELETE FROM broadcast_contacts 
+            WHERE id NOT IN (
+                SELECT MIN(id) 
+                FROM broadcast_contacts 
+                WHERE broadcast_list_id = $1 
+                GROUP BY contact_number
+            ) 
+            AND broadcast_list_id = $1
+        `;
+        const result = await pool.query(query, [listId]);
+        return result.rowCount;
     },
 
     // === BROADCAST CAMPAIGNS ===
@@ -558,6 +581,16 @@ const broadcastQueries = {
             LIMIT $3 OFFSET $4
         `;
         const result = await pool.query(query, [userId, sessionId, limit, offset]);
+        return result.rows;
+    },
+
+    // Get active campaigns by list
+    getActiveCampaignsByList: async (listId) => {
+        const query = `
+            SELECT * FROM broadcast_campaigns 
+            WHERE broadcast_list_id = $1 AND status IN ('sending', 'paused')
+        `;
+        const result = await pool.query(query, [listId]);
         return result.rows;
     },
 
@@ -619,12 +652,17 @@ const broadcastQueries = {
     createBroadcastMessages: async (campaignId, contacts) => {
         if (!contacts || contacts.length === 0) return [];
 
-        const values = contacts.map((_, index) =>
+        // Remove duplicates based on contact_number
+        const uniqueContacts = contacts.filter((contact, index, self) => 
+            index === self.findIndex(c => c.contact_number === contact.contact_number)
+        );
+
+        const values = uniqueContacts.map((_, index) =>
             `($1, $${index * 2 + 2}, $${index * 2 + 3})`
         ).join(', ');
 
         const params = [campaignId];
-        contacts.forEach(contact => {
+        uniqueContacts.forEach(contact => {
             params.push(contact.contact_number, contact.contact_name);
         });
 
@@ -813,7 +851,7 @@ const broadcastQueries = {
             `AND (contact_name ILIKE $2 OR contact_number ILIKE $2)` : '';
         
         const query = `
-            SELECT COUNT(*) as total 
+            SELECT COUNT(DISTINCT contact_number) as total 
             FROM broadcast_contacts 
             WHERE broadcast_list_id = $1 AND is_active = true
             ${searchQuery}
@@ -1083,14 +1121,22 @@ const broadcastQueries = {
         
         const query = `
             SELECT bl.*, 
-                   COUNT(bc.id) as contact_count,
-                   COUNT(bcm.id) as campaign_count
+                   COALESCE(contact_counts.contact_count, 0) as contact_count,
+                   COALESCE(campaign_counts.campaign_count, 0) as campaign_count
             FROM broadcast_lists bl
-            LEFT JOIN broadcast_contacts bc ON bl.id = bc.broadcast_list_id AND bc.is_active = true
-            LEFT JOIN broadcast_campaigns bcm ON bl.id = bcm.broadcast_list_id
+            LEFT JOIN (
+                SELECT broadcast_list_id, COUNT(*) as contact_count
+                FROM broadcast_contacts 
+                WHERE is_active = true
+                GROUP BY broadcast_list_id
+            ) contact_counts ON bl.id = contact_counts.broadcast_list_id
+            LEFT JOIN (
+                SELECT broadcast_list_id, COUNT(*) as campaign_count
+                FROM broadcast_campaigns 
+                GROUP BY broadcast_list_id
+            ) campaign_counts ON bl.id = campaign_counts.broadcast_list_id
             WHERE bl.user_id = $1 AND bl.session_id = $2 AND bl.is_active = true
             ${searchQuery}
-            GROUP BY bl.id
             ORDER BY bl.created_at DESC
             LIMIT $3 OFFSET $4
         `;
@@ -1147,7 +1193,7 @@ const broadcastQueries = {
             `AND (contact_name ILIKE $2 OR contact_number ILIKE $2)` : '';
         
         const query = `
-            SELECT COUNT(*) as total 
+            SELECT COUNT(DISTINCT contact_number) as total 
             FROM broadcast_contacts 
             WHERE broadcast_list_id = $1 AND is_active = true
             ${searchQuery}
@@ -1155,6 +1201,18 @@ const broadcastQueries = {
         
         const params = search ? [listId, `%${search}%`] : [listId];
         const result = await pool.query(query, params);
+        return parseInt(result.rows[0].total);
+    },
+
+    // Get accurate contact count for a specific list
+    getAccurateContactCount: async (listId) => {
+        const query = `
+            SELECT COUNT(DISTINCT contact_number) as total 
+            FROM broadcast_contacts 
+            WHERE broadcast_list_id = $1 AND is_active = true
+        `;
+        
+        const result = await pool.query(query, [listId]);
         return parseInt(result.rows[0].total);
     },
     

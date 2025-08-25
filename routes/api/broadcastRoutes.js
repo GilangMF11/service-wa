@@ -54,14 +54,52 @@ router.put('/:sessionId/broadcast/lists/:listId',
 );
 
 // DELETE /:sessionId/broadcast/lists/:listId - Delete broadcast list
-router.delete('/:sessionId/broadcast/lists/:listId', 
+router.delete('/:sessionId/broadcast/lists/:listId',
     broadcastMiddleware.validateSession,
     broadcastMiddleware.validateListOwnership,
     broadcastMiddleware.broadcastRateLimit,
     broadcastController.deleteBroadcastList
 );
 
+// GET /:sessionId/broadcast/check-client - Check client status
+router.get('/:sessionId/broadcast/check-client',
+    broadcastMiddleware.validateSession,
+    broadcastController.checkClientStatus
+);
+
+// POST /:sessionId/broadcast/reconnect-client - Reconnect client
+router.post('/:sessionId/broadcast/reconnect-client',
+    broadcastMiddleware.validateSession,
+    broadcastController.reconnectClient
+);
+
+// POST /:sessionId/broadcast/fix-client-status - Fix undefined client status
+router.post('/:sessionId/broadcast/fix-client-status',
+    broadcastMiddleware.validateSession,
+    broadcastController.fixClientStatus
+);
+
+// POST /:sessionId/broadcast/fix-client-structure - Fix client structure
+router.post('/:sessionId/broadcast/fix-client-structure',
+    broadcastMiddleware.validateSession,
+    broadcastController.fixClientStructure
+);
+
+// POST /:sessionId/broadcast/lists/:listId/clean-duplicates - Clean duplicate contacts
+router.post('/:sessionId/broadcast/lists/:listId/clean-duplicates',
+    broadcastMiddleware.validateSession,
+    broadcastMiddleware.validateListOwnership,
+    broadcastController.cleanDuplicateContacts
+);
+
 // === BROADCAST CONTACTS ROUTES ===
+
+// GET /:sessionId/broadcast/lists/:listId/contact-count - Get accurate contact count
+router.get('/:sessionId/broadcast/lists/:listId/contact-count',
+    broadcastMiddleware.validateSession,
+    broadcastMiddleware.validateListOwnership,
+    broadcastController.getBroadcastListContactCount
+);
 
 // GET /:sessionId/broadcast/lists/:listId/contacts - Get contacts in broadcast list
 router.get('/:sessionId/broadcast/lists/:listId/contacts', 

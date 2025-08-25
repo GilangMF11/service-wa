@@ -18,14 +18,35 @@ const getContacts = async (req, res) => {
         
         res.status(200).json({
             success: true,
-            contacts: contacts.map(contact => ({
-                id: contact.id._serialized,
-                name: contact.name || contact.pushname || '',
-                number: contact.number,
-                isGroup: contact.isGroup,
-                isWAContact: contact.isWAContact,
-                profilePictureUrl: contact.profilePictureUrl || null
-            }))
+            contacts: contacts.map(contact => {
+                // Robust contact ID extraction
+                let contactId = null;
+                try {
+                    if (contact.id) {
+                        if (contact.id._serialized) {
+                            contactId = contact.id._serialized;
+                        } else if (contact.id.id) {
+                            contactId = contact.id.id;
+                        } else if (typeof contact.id === 'string') {
+                            contactId = contact.id;
+                        } else {
+                            contactId = JSON.stringify(contact.id);
+                        }
+                    }
+                } catch (error) {
+                    console.warn('Failed to extract contact ID:', error.message);
+                    contactId = 'unknown';
+                }
+
+                return {
+                    id: contactId,
+                    name: contact.name || contact.pushname || '',
+                    number: contact.number,
+                    isGroup: contact.isGroup,
+                    isWAContact: contact.isWAContact,
+                    profilePictureUrl: contact.profilePictureUrl || null
+                };
+            })
         });
     } catch (error) {
         console.error('Error saat mengambil kontak:', error);
@@ -68,10 +89,29 @@ const getContact = async (req, res) => {
             console.log('Tidak dapat mengambil foto profil');
         }
         
+        // Robust contact ID extraction
+        let extractedContactId = null;
+        try {
+            if (contact.id) {
+                if (contact.id._serialized) {
+                    extractedContactId = contact.id._serialized;
+                } else if (contact.id.id) {
+                    extractedContactId = contact.id.id;
+                } else if (typeof contact.id === 'string') {
+                    extractedContactId = contact.id;
+                } else {
+                    extractedContactId = JSON.stringify(contact.id);
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to extract contact ID:', error.message);
+            extractedContactId = 'unknown';
+        }
+
         res.status(200).json({
             success: true,
             contact: {
-                id: contact.id._serialized,
+                id: extractedContactId,
                 name: contact.name || contact.pushname || '',
                 number: contact.number,
                 isGroup: contact.isGroup,

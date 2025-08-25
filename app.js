@@ -143,12 +143,31 @@ const createWhatsAppClient = async (sessionRecord) => {
         try {
             const io = require('./socket').getIO();
             if (clients[session_id]) {
+                // Robust message ID extraction
+                let messageId = null;
+                try {
+                    if (msg.id) {
+                        if (msg.id._serialized) {
+                            messageId = msg.id._serialized;
+                        } else if (msg.id.id) {
+                            messageId = msg.id.id;
+                        } else if (typeof msg.id === 'string') {
+                            messageId = msg.id;
+                        } else {
+                            messageId = JSON.stringify(msg.id);
+                        }
+                    }
+                } catch (error) {
+                    console.warn('Failed to extract message ID:', error.message);
+                    messageId = 'unknown';
+                }
+
                 io.to(session_id).emit('receive-message', {
                     contactId: msg.from,
                     message: msg.body,
                     fromMe: false,
                     timestamp: msg.timestamp,
-                    id: msg.id.id
+                    id: messageId
                 });
             }
         } catch (err) {
@@ -702,15 +721,54 @@ app.post('/api/whatsapp/session/:sessionId/send', async (req, res) => {
             formattedNumber = `${formattedNumber}@c.us`;
         }
 
-        // Kirim pesan
-        const sendResult = await clients[sessionId].client.sendMessage(formattedNumber, message);
-        
+        // Kirim pesan dengan error handling yang robust
+        let sendResult;
+        let messageId = null;
+        let timestamp = Date.now();
+
+        try {
+            sendResult = await clients[sessionId].client.sendMessage(formattedNumber, message);
+            
+            // Robust message ID extraction
+            try {
+                if (sendResult && sendResult.id) {
+                    if (sendResult.id._serialized) {
+                        messageId = sendResult.id._serialized;
+                    } else if (sendResult.id.id) {
+                        messageId = sendResult.id.id;
+                    } else if (typeof sendResult.id === 'string') {
+                        messageId = sendResult.id;
+                    } else {
+                        messageId = JSON.stringify(sendResult.id);
+                    }
+                }
+                
+                // Get timestamp from result if available
+                if (sendResult && sendResult.timestamp) {
+                    timestamp = sendResult.timestamp;
+                }
+            } catch (extractError) {
+                console.warn('Failed to extract message ID:', extractError.message);
+                messageId = 'unknown';
+            }
+        } catch (sendError) {
+            // Check if it's a serialize error (message was sent but ID extraction failed)
+            if (sendError.message && sendError.message.includes('serialize')) {
+                console.warn('Message sent but failed to get confirmation ID (serialize error)');
+                messageId = 'sent_no_id';
+                // Message was actually sent, so we consider it successful
+            } else {
+                // Re-throw other errors
+                throw sendError;
+            }
+        }
+
         res.status(200).json({ 
             success: true, 
-            message: 'Pesan berhasil dikirim',
+            message: messageId === 'sent_no_id' ? 'Pesan berhasil dikirim (tanpa ID konfirmasi)' : 'Pesan berhasil dikirim',
             data: {
-                id: sendResult.id.id,
-                timestamp: sendResult.timestamp,
+                id: messageId,
+                timestamp: timestamp,
                 to: formattedNumber
             }
         });

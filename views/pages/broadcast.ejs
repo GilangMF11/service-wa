@@ -44,6 +44,18 @@
                                 <label class="form-label fw-medium">Session Status</label>
                                 <div class="d-flex align-items-center">
                                     <span id="sessionStatus" class="badge bg-secondary">Not Selected</span>
+                                    <button type="button" class="btn btn-sm btn-outline-primary ms-2" onclick="refreshClientStatus()">
+                                        <i class="bi bi-arrow-clockwise"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-warning ms-1" onclick="reconnectClient()">
+                                        <i class="bi bi-arrow-repeat"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-info ms-1" onclick="fixClientStatus()">
+                                        <i class="bi bi-wrench"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary ms-1" onclick="fixClientStructure()">
+                                        <i class="bi bi-gear"></i>
+                                    </button>
                                 </div>
                             </div>
                             <div class="col-lg-4">
@@ -72,7 +84,12 @@
                                     <i class="bi bi-list-ul text-primary fs-4 me-2"></i>
                                     <h5 class="card-title fw-bold mb-0">Broadcast Lists</h5>
                                 </div>
-                                <div class="badge bg-primary rounded-pill" id="totalListsText">0 lists</div>
+                                <div class="d-flex align-items-center">
+                                    <button class="btn btn-sm btn-outline-primary me-2" onclick="refreshContactCounts()" title="Refresh contact counts">
+                                        <i class="bi bi-arrow-clockwise"></i>
+                                    </button>
+                                    <div class="badge bg-primary rounded-pill" id="totalListsText">0 lists</div>
+                                </div>
                             </div>
                         </div>
                         <div class="card-body">
@@ -192,7 +209,17 @@
                     </div>
                     
                     <div class="mb-4">
-                        <label class="form-label fw-medium">Add Contacts</label>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <label class="form-label fw-medium mb-0">Add Contacts</label>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button type="button" class="btn btn-outline-success" onclick="loadSessionContacts()">
+                                    <i class="bi bi-people me-1"></i>Load from Session
+                                </button>
+                                <button type="button" class="btn btn-outline-info" onclick="showContactSelector()">
+                                    <i class="bi bi-check2-square me-1"></i>Select Contacts
+                                </button>
+                            </div>
+                        </div>
                         <div class="border rounded p-3">
                             <div class="mb-3">
                                 <div class="input-group">
@@ -225,6 +252,225 @@
                     <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary px-4">
                         <i class="bi bi-check2 me-2"></i>Create List
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Contact Selector Modal -->
+<div class="modal fade" id="contactSelectorModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-people me-2"></i>Select Contacts from Session
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <span class="input-group-text bg-white border-end-0">
+                                <i class="bi bi-search text-info"></i>
+                            </span>
+                            <input type="text" id="contactSearch" class="form-control border-start-0" placeholder="Search contacts...">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-info" onclick="selectAllSessionContacts()">
+                                <i class="bi bi-check-all me-1"></i>Select All
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="deselectAllSessionContacts()">
+                                <i class="bi bi-x-circle me-1"></i>Deselect All
+                            </button>
+                            <button type="button" class="btn btn-sm btn-success" onclick="addSelectedContacts()">
+                                <i class="bi bi-plus-circle me-1"></i>Add Selected
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="sessionContactsLoading" class="text-center py-4">
+                    <div class="spinner-border text-info" role="status"></div>
+                    <p class="mt-3 text-muted">Loading contacts...</p>
+                </div>
+                
+                <div id="sessionContactsContent" style="display: none;">
+                    <div class="row" id="sessionContactsList">
+                        <!-- Session contacts will be loaded here -->
+                    </div>
+                </div>
+                
+                <div id="sessionContactsEmpty" class="text-center py-4" style="display: none;">
+                    <i class="bi bi-people text-muted" style="font-size: 3rem;"></i>
+                    <h6 class="mt-3 text-muted">No contacts found</h6>
+                    <p class="text-muted">No contacts available in this session</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- View Contacts Modal -->
+<div class="modal fade" id="viewContactsModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-people me-2"></i>View Contacts
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <span class="input-group-text bg-white border-end-0">
+                                <i class="bi bi-search text-primary"></i>
+                            </span>
+                            <input type="text" id="viewContactSearch" class="form-control border-start-0" placeholder="Search contacts...">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="exportContacts()">
+                                <i class="bi bi-download me-1"></i>Export
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-info" onclick="refreshViewContacts()">
+                                <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="viewContactsLoading" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-3 text-muted">Loading contacts...</p>
+                </div>
+                
+                <div id="viewContactsContent" style="display: none;">
+                    <div class="row" id="viewContactsList">
+                        <!-- Contacts will be loaded here -->
+                    </div>
+                </div>
+                
+                <div id="viewContactsEmpty" class="text-center py-4" style="display: none;">
+                    <i class="bi bi-people text-muted" style="font-size: 3rem;"></i>
+                    <h6 class="mt-3 text-muted">No contacts found</h6>
+                    <p class="text-muted">No contacts available in this list</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Broadcast List Modal -->
+<div class="modal fade" id="editListModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title">
+                    <i class="bi bi-pencil-square me-2"></i>Edit Broadcast List
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editListForm">
+                <div class="modal-body p-4">
+                    <input type="hidden" id="editListId">
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <label for="editListName" class="form-label fw-medium">List Name *</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white border-end-0">
+                                    <i class="bi bi-list-ul text-warning"></i>
+                                </span>
+                                <input type="text" class="form-control border-start-0" id="editListName" required placeholder="Enter list name">
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <label for="editListDescription" class="form-label fw-medium">Description</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white border-end-0">
+                                    <i class="bi bi-card-text text-warning"></i>
+                                </span>
+                                <input type="text" class="form-control border-start-0" id="editListDescription" placeholder="Enter description">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                <label class="form-label fw-medium mb-0">Manage Contacts</label>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <button type="button" class="btn btn-outline-success" onclick="loadSessionContactsForEdit()">
+                                        <i class="bi bi-people me-1"></i>Load from Session
+                                    </button>
+                                    <button type="button" class="btn btn-outline-warning" onclick="showAddContactsSection()">
+                                        <i class="bi bi-plus-circle me-1"></i>Add Contacts
+                                    </button>
+                                    <button type="button" class="btn btn-outline-info" onclick="showRemoveContactsSection()">
+                                        <i class="bi bi-dash-circle me-1"></i>Remove Contacts
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger" onclick="cleanDuplicateContacts()">
+                                        <i class="bi bi-trash me-1"></i>Clean Duplicates
+                                    </button>
+                                </div>
+                            </div>
+                        
+                        <!-- Add Contacts Section -->
+                        <div id="addContactsSection" class="border rounded p-3" style="display: none;">
+                            <h6 class="fw-medium mb-3">Add New Contacts</h6>
+                            <div class="alert alert-info mb-3">
+                                <i class="bi bi-info-circle me-2"></i>
+                                <small>New contacts will be added to the existing list. Duplicate numbers will be ignored.</small>
+                            </div>
+                            <div class="mb-3">
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white border-end-0">
+                                        <i class="bi bi-person-plus text-warning"></i>
+                                    </span>
+                                    <input type="text" id="editContactNumber" class="form-control border-start-0 border-end-0" placeholder="Contact number (628xxxxxxxxx)">
+                                    <input type="text" id="editContactName" class="form-control border-start-0" placeholder="Contact name">
+                                    <button type="button" class="btn btn-outline-warning" onclick="addContactToEditList()">
+                                        <i class="bi bi-plus"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="editContactsTextarea" class="form-label small">Or paste multiple contacts (format: number,name per line)</label>
+                                <textarea id="editContactsTextarea" class="form-control" rows="3" placeholder="628123456789,John Doe&#10;628987654321,Jane Smith"></textarea>
+                                <button type="button" class="btn btn-sm btn-outline-secondary mt-2" onclick="parseContactsFromEditTextarea()">
+                                    <i class="bi bi-upload me-1"></i>Parse Contacts
+                                </button>
+                            </div>
+                            
+                            <div id="editContactsList" class="mt-3">
+                                <!-- New contacts to add will appear here -->
+                            </div>
+                        </div>
+                        
+                        <!-- Remove Contacts Section -->
+                        <div id="removeContactsSection" class="border rounded p-3" style="display: none;">
+                            <h6 class="fw-medium mb-3">Remove Existing Contacts</h6>
+                            <div class="alert alert-warning mb-3">
+                                <i class="bi bi-exclamation-triangle me-2"></i>
+                                <small>Selected contacts will be permanently removed from this list. This action cannot be undone.</small>
+                            </div>
+                            <div id="existingContactsList" class="mt-3">
+                                <!-- Existing contacts will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 px-4 pb-4">
+                    <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning px-4">
+                        <i class="bi bi-check2 me-2"></i>Update List
                     </button>
                 </div>
             </form>
@@ -410,6 +656,55 @@
     .status-draft {
         background: linear-gradient(45deg, #6c757d, #8a929b) !important;
     }
+    
+    /* Edit Modal Styles */
+    .modal-header.bg-warning {
+        background: linear-gradient(45deg, #ffc107, #ffca28) !important;
+    }
+    
+    .btn-warning {
+        background: linear-gradient(45deg, #ffc107, #ffca28);
+        border: none;
+        box-shadow: 0 4px 12px rgba(255, 193, 7, 0.2);
+        color: #000;
+    }
+    
+    .btn-warning:hover {
+        background: linear-gradient(45deg, #e0a800, #ffc107);
+        box-shadow: 0 6px 16px rgba(255, 193, 7, 0.3);
+        transform: translateY(-2px);
+        color: #000;
+    }
+    
+    .btn-outline-warning {
+        border-color: #ffc107;
+        color: #ffc107;
+    }
+    
+    .btn-outline-warning:hover {
+        background-color: #ffc107;
+        border-color: #ffc107;
+        color: #000;
+    }
+    
+    /* Contact management styles */
+    .contact-checkbox {
+        margin-right: 0.5rem;
+    }
+    
+    .contact-item-edit {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 6px;
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+        transition: all 0.3s ease;
+    }
+    
+    .contact-item-edit:hover {
+        background: #ffeaa7;
+        border-color: #ffc107;
+    }
 </style>
 
 <script>
@@ -550,6 +845,9 @@
             loadBroadcastLists(),
             loadBroadcastCampaigns()
         ]);
+        
+        // Update session status
+        await refreshClientStatus();
     };
 
     // Load broadcast lists
@@ -564,6 +862,20 @@
             
             if (data.success) {
                 broadcastLists = data.data.lists;
+                
+                // Get accurate contact counts for each list
+                await Promise.all(broadcastLists.map(async (list) => {
+                    try {
+                        const countResponse = await apiCall(`/api/whatsapp/${currentSessionId}/broadcast/lists/${list.id}/contact-count`);
+                        const countData = await countResponse.json();
+                        if (countData.success) {
+                            list.accurate_contact_count = countData.data.contactCount;
+                        }
+                    } catch (error) {
+                        console.warn(`Failed to get accurate contact count for list ${list.id}:`, error);
+                        list.accurate_contact_count = list.contact_count || 0;
+                    }
+                }));
                 
                 if (broadcastLists.length === 0) {
                     document.getElementById('listsLoading').style.display = 'none';
@@ -598,7 +910,7 @@
                         <p class="text-muted mb-2 small">${list.description || 'No description'}</p>
                         <div class="d-flex align-items-center">
                             <span class="badge bg-light text-dark me-2">
-                                <i class="bi bi-people me-1"></i>${list.contact_count} contacts
+                                <i class="bi bi-people me-1"></i>${list.accurate_contact_count || list.contact_count || 0} contacts
                             </span>
                             <span class="badge bg-info text-white">
                                 <i class="bi bi-broadcast me-1"></i>${list.campaign_count} campaigns
@@ -613,7 +925,7 @@
                             <li><a class="dropdown-item" href="#" onclick="editBroadcastList(${list.id})"><i class="bi bi-pencil me-2"></i>Edit</a></li>
                             <li><a class="dropdown-item" href="#" onclick="viewContacts(${list.id})"><i class="bi bi-people me-2"></i>View Contacts</a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-danger" href="#" onclick="deleteBroadcastList(${list.id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
+                            <li><a class="dropdown-item text-danger" href="#" onclick="deleteBroadcastList(${list.id}, '${list.name}')"><i class="bi bi-trash me-2"></i>Delete</a></li>
                         </ul>
                     </div>
                 </div>
@@ -696,9 +1008,10 @@
         
         broadcastLists.forEach(list => {
             const option = document.createElement('option');
+            const contactCount = list.accurate_contact_count || list.contact_count || 0;
             option.value = list.id;
-            option.textContent = `${list.name} (${list.contact_count} contacts)`;
-            option.dataset.contactCount = list.contact_count;
+            option.textContent = `${list.name} (${contactCount} contacts)`;
+            option.dataset.contactCount = contactCount;
             option.dataset.description = list.description;
             select.appendChild(option);
         });
@@ -722,6 +1035,565 @@
         } else {
             infoDiv.innerHTML = '<p class="mb-0 text-muted">Select a list to see details</p>';
         }
+    });
+
+    // Check client status before sending broadcast
+    const checkClientStatus = async () => {
+        try {
+            const response = await apiCall(`/api/whatsapp/${currentSessionId}/broadcast/check-client`);
+            const data = await response.json();
+            
+            if (data.success) {
+                if (!data.data.isReady) {
+                    showToast('WhatsApp client is not ready. Please scan QR code first.', 'warning');
+                    return false;
+                }
+                return true;
+            } else {
+                showToast('Failed to check client status', 'error');
+                return false;
+            }
+        } catch (error) {
+            console.error('Error checking client status:', error);
+            showToast('Error checking client status', 'error');
+            return false;
+        }
+    };
+
+    // Refresh client status
+    const refreshClientStatus = async () => {
+        if (!currentSessionId) {
+            showToast('Please select a session first', 'warning');
+            return;
+        }
+
+        try {
+            const response = await apiCall(`/api/whatsapp/${currentSessionId}/broadcast/check-client`);
+            const data = await response.json();
+            
+            const statusElement = document.getElementById('sessionStatus');
+            
+            if (data.success) {
+                if (data.data.isReady) {
+                    statusElement.className = 'badge bg-success';
+                    statusElement.textContent = 'Ready';
+                } else {
+                    statusElement.className = 'badge bg-warning';
+                    statusElement.textContent = 'Not Ready';
+                }
+                
+                // Log debug info if available
+                if (data.data.debug) {
+                    console.log('Client debug info:', data.data.debug);
+                }
+            } else {
+                statusElement.className = 'badge bg-danger';
+                statusElement.textContent = 'Error';
+            }
+        } catch (error) {
+            console.error('Error refreshing client status:', error);
+            const statusElement = document.getElementById('sessionStatus');
+            statusElement.className = 'badge bg-danger';
+            statusElement.textContent = 'Error';
+        }
+    };
+
+    // Reconnect client
+    const reconnectClient = async () => {
+        if (!currentSessionId) {
+            showToast('Please select a session first', 'warning');
+            return;
+        }
+
+        try {
+            showToast('Reconnecting client...', 'info');
+            
+            const response = await apiCall(`/api/whatsapp/${currentSessionId}/broadcast/reconnect-client`, {
+                method: 'POST'
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showToast('Client reconnection initiated', 'success');
+                
+                // Wait a bit then refresh status
+                setTimeout(async () => {
+                    await refreshClientStatus();
+                }, 3000);
+            } else {
+                showToast(data.message || 'Failed to reconnect client', 'error');
+            }
+        } catch (error) {
+            console.error('Error reconnecting client:', error);
+            showToast('Failed to reconnect client', 'error');
+        }
+    };
+
+    // Fix client status
+    const fixClientStatus = async () => {
+        if (!currentSessionId) {
+            showToast('Please select a session first', 'warning');
+            return;
+        }
+
+        try {
+            showToast('Fixing client status...', 'info');
+            
+            const response = await apiCall(`/api/whatsapp/${currentSessionId}/broadcast/fix-client-status`, {
+                method: 'POST'
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                if (data.data.fixed) {
+                    showToast('Client status fixed successfully', 'success');
+                } else {
+                    showToast('Client status is already correct', 'info');
+                }
+                
+                // Refresh status
+                await refreshClientStatus();
+            } else {
+                showToast(data.message || 'Failed to fix client status', 'error');
+            }
+        } catch (error) {
+            console.error('Error fixing client status:', error);
+            showToast('Failed to fix client status', 'error');
+        }
+    };
+
+    // Fix client structure
+    const fixClientStructure = async () => {
+        if (!currentSessionId) {
+            showToast('Please select a session first', 'warning');
+            return;
+        }
+
+        try {
+            showToast('Fixing client structure...', 'info');
+            
+            const response = await apiCall(`/api/whatsapp/${currentSessionId}/broadcast/fix-client-structure`, {
+                method: 'POST'
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showToast('Client structure fixed successfully', 'success');
+                
+                // Refresh status
+                await refreshClientStatus();
+            } else {
+                showToast(data.message || 'Failed to fix client structure', 'error');
+            }
+        } catch (error) {
+            console.error('Error fixing client structure:', error);
+            showToast('Failed to fix client structure', 'error');
+        }
+    };
+
+    // Refresh contact counts for all lists
+    const refreshContactCounts = async () => {
+        if (!currentSessionId) {
+            showToast('Please select a session first', 'warning');
+            return;
+        }
+
+        try {
+            showToast('Refreshing contact counts...', 'info');
+            
+            // Reload broadcast lists with accurate contact counts
+            await loadBroadcastLists();
+            
+            showToast('Contact counts refreshed successfully', 'success');
+        } catch (error) {
+            console.error('Error refreshing contact counts:', error);
+            showToast('Failed to refresh contact counts', 'error');
+        }
+    };
+
+    // Session contacts management
+    let sessionContacts = [];
+    let selectedSessionContacts = new Set();
+
+    // Load contacts from session
+    const loadSessionContacts = async () => {
+        if (!currentSessionId) {
+            showToast('Please select a session first', 'warning');
+            return;
+        }
+
+        try {
+            showToast('Loading contacts from session...', 'info');
+            
+            const response = await apiCall(`/api/whatsapp/${currentSessionId}/contacts`);
+            const data = await response.json();
+            
+            if (data.success) {
+                sessionContacts = data.contacts.filter(contact => !contact.isGroup); // Exclude groups
+                showToast(`Loaded ${sessionContacts.length} contacts from session`, 'success');
+                
+                // Show contact selector modal
+                showContactSelector();
+            } else {
+                showToast(data.message || 'Failed to load contacts', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading session contacts:', error);
+            showToast('Failed to load contacts from session', 'error');
+        }
+    };
+
+    // Show contact selector modal
+    const showContactSelector = () => {
+        if (sessionContacts.length === 0) {
+            showToast('No contacts available in session', 'warning');
+            return;
+        }
+
+        // Reset selections
+        selectedSessionContacts.clear();
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('contactSelectorModal'));
+        modal.show();
+        
+        // Render contacts
+        renderSessionContacts();
+    };
+
+    // Render session contacts in modal
+    const renderSessionContacts = () => {
+        const container = document.getElementById('sessionContactsList');
+        const loading = document.getElementById('sessionContactsLoading');
+        const content = document.getElementById('sessionContactsContent');
+        const empty = document.getElementById('sessionContactsEmpty');
+
+        if (sessionContacts.length === 0) {
+            loading.style.display = 'none';
+            content.style.display = 'none';
+            empty.style.display = 'block';
+            return;
+        }
+
+        loading.style.display = 'none';
+        content.style.display = 'block';
+        empty.style.display = 'none';
+
+        container.innerHTML = '';
+
+        sessionContacts.forEach(contact => {
+            const contactCard = document.createElement('div');
+            contactCard.className = 'col-md-6 col-lg-4 mb-3';
+            contactCard.innerHTML = `
+                <div class="card border h-100">
+                    <div class="card-body p-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" 
+                                   id="contact_${contact.id}" 
+                                   value="${contact.id}"
+                                   onchange="toggleContactSelection('${contact.id}')">
+                            <label class="form-check-label" for="contact_${contact.id}">
+                                <div class="d-flex align-items-center">
+                                    <div class="flex-shrink-0">
+                                        <div class="avatar avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center">
+                                            ${contact.name ? contact.name.charAt(0).toUpperCase() : contact.number.charAt(0)}
+                                        </div>
+                                    </div>
+                                    <div class="flex-grow-1 ms-3">
+                                        <h6 class="mb-1">${contact.name || 'Unknown'}</h6>
+                                        <small class="text-muted">${contact.number}</small>
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(contactCard);
+        });
+    };
+
+    // Toggle contact selection
+    const toggleContactSelection = (contactId) => {
+        if (selectedSessionContacts.has(contactId)) {
+            selectedSessionContacts.delete(contactId);
+        } else {
+            selectedSessionContacts.add(contactId);
+        }
+    };
+
+    // Select all session contacts
+    const selectAllSessionContacts = () => {
+        sessionContacts.forEach(contact => {
+            selectedSessionContacts.add(contact.id);
+            const checkbox = document.getElementById(`contact_${contact.id}`);
+            if (checkbox) checkbox.checked = true;
+        });
+    };
+
+    // Deselect all session contacts
+    const deselectAllSessionContacts = () => {
+        selectedSessionContacts.clear();
+        sessionContacts.forEach(contact => {
+            const checkbox = document.getElementById(`contact_${contact.id}`);
+            if (checkbox) checkbox.checked = false;
+        });
+    };
+
+    // Add selected contacts to list
+    const addSelectedContacts = () => {
+        if (selectedSessionContacts.size === 0) {
+            showToast('Please select at least one contact', 'warning');
+            return;
+        }
+
+        const selectedContacts = sessionContacts.filter(contact => 
+            selectedSessionContacts.has(contact.id)
+        );
+
+        // Check if we're in edit mode or create mode
+        const isEditMode = document.getElementById('editListId').value;
+        
+        if (isEditMode) {
+            // Add to edit contacts list (same logic as create mode)
+            selectedContacts.forEach(contact => {
+                const cleanNumber = contact.number.replace(/\D/g, '');
+                const exists = contactsToAdd.find(c => c.number === cleanNumber);
+                
+                if (!exists) {
+                    contactsToAdd.push({
+                        number: cleanNumber,
+                        name: contact.name || contact.number
+                    });
+                }
+            });
+            
+            // Update edit display
+            renderEditContactsList();
+        } else {
+            // Add to create contacts list
+            selectedContacts.forEach(contact => {
+                const cleanNumber = contact.number.replace(/\D/g, '');
+                const exists = contactsToAdd.find(c => c.number === cleanNumber);
+                
+                if (!exists) {
+                    contactsToAdd.push({
+                        number: cleanNumber,
+                        name: contact.name || contact.number
+                    });
+                }
+            });
+            
+            // Update create display
+            renderContactsList();
+        }
+        
+        // Close modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('contactSelectorModal'));
+        modal.hide();
+        
+        showToast(`Added ${selectedContacts.length} contacts to list`, 'success');
+    };
+
+    // Load session contacts for edit mode
+    const loadSessionContactsForEdit = async () => {
+        if (!currentSessionId) {
+            showToast('Please select a session first', 'warning');
+            return;
+        }
+
+        try {
+            showToast('Loading contacts from session...', 'info');
+            
+            const response = await apiCall(`/api/whatsapp/${currentSessionId}/contacts`);
+            const data = await response.json();
+            
+            if (data.success) {
+                sessionContacts = data.contacts.filter(contact => !contact.isGroup); // Exclude groups
+                showToast(`Loaded ${sessionContacts.length} contacts from session`, 'success');
+                
+                // Show contact selector modal
+                showContactSelector();
+            } else {
+                showToast(data.message || 'Failed to load contacts', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading session contacts:', error);
+            showToast('Failed to load contacts from session', 'error');
+        }
+    };
+
+    // Contact search functionality
+    document.getElementById('contactSearch')?.addEventListener('input', (e) => {
+        const searchTerm = e.target.value.toLowerCase();
+        const contactCards = document.querySelectorAll('#sessionContactsList .col-md-6');
+        
+        contactCards.forEach(card => {
+            const contactName = card.querySelector('h6').textContent.toLowerCase();
+            const contactNumber = card.querySelector('small').textContent.toLowerCase();
+            
+            if (contactName.includes(searchTerm) || contactNumber.includes(searchTerm)) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    });
+
+    // View contacts functionality
+    let currentViewListId = null;
+    let viewContactsData = [];
+
+    // View contacts function
+    const viewContacts = async (listId) => {
+        try {
+            currentViewListId = listId;
+            
+            // Check if session is selected
+            if (!currentSessionId) {
+                showToast('Please select a WhatsApp session first', 'warning');
+                return;
+            }
+
+            // Find the list data
+            const list = broadcastLists.find(l => l.id === listId);
+            if (!list) {
+                showToast('List not found', 'error');
+                return;
+            }
+
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('viewContactsModal'));
+            modal.show();
+            
+            // Load contacts
+            await loadViewContacts(listId);
+        } catch (error) {
+            console.error('Error opening view contacts modal:', error);
+            showToast('Failed to open view contacts modal', 'error');
+        }
+    };
+
+    // Load contacts for view modal
+    const loadViewContacts = async (listId) => {
+        try {
+            const response = await apiCall(`/api/whatsapp/${currentSessionId}/broadcast/lists/${listId}/contacts`);
+            const data = await response.json();
+            
+            if (data.success) {
+                viewContactsData = data.data.contacts;
+                renderViewContacts();
+            } else {
+                throw new Error(data.message || 'Failed to load contacts');
+            }
+        } catch (error) {
+            console.error('Error loading view contacts:', error);
+            showToast('Failed to load contacts: ' + error.message, 'error');
+        }
+    };
+
+    // Render contacts in view modal
+    const renderViewContacts = () => {
+        const loading = document.getElementById('viewContactsLoading');
+        const content = document.getElementById('viewContactsContent');
+        const empty = document.getElementById('viewContactsEmpty');
+        const container = document.getElementById('viewContactsList');
+
+        if (viewContactsData.length === 0) {
+            loading.style.display = 'none';
+            content.style.display = 'none';
+            empty.style.display = 'block';
+            return;
+        }
+
+        loading.style.display = 'none';
+        content.style.display = 'block';
+        empty.style.display = 'none';
+
+        container.innerHTML = '';
+
+        viewContactsData.forEach(contact => {
+            const contactCard = document.createElement('div');
+            contactCard.className = 'col-md-6 col-lg-4 mb-3';
+            contactCard.innerHTML = `
+                <div class="card border h-100">
+                    <div class="card-body p-3">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-shrink-0">
+                                <div class="avatar avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center">
+                                    ${contact.contact_name ? contact.contact_name.charAt(0).toUpperCase() : contact.contact_number.charAt(0)}
+                                </div>
+                            </div>
+                            <div class="flex-grow-1 ms-3">
+                                <h6 class="mb-1">${contact.contact_name || 'Unknown'}</h6>
+                                <small class="text-muted">${contact.contact_number}</small>
+                                <br><small class="text-muted">Added: ${new Date(contact.created_at).toLocaleDateString()}</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(contactCard);
+        });
+    };
+
+    // Refresh view contacts
+    const refreshViewContacts = async () => {
+        if (currentViewListId) {
+            await loadViewContacts(currentViewListId);
+        }
+    };
+
+    // Export contacts
+    const exportContacts = () => {
+        if (viewContactsData.length === 0) {
+            showToast('No contacts to export', 'warning');
+            return;
+        }
+
+        const list = broadcastLists.find(l => l.id === currentViewListId);
+        const listName = list ? list.name : 'contacts';
+        
+        // Create CSV content
+        const csvContent = [
+            'Name,Number,Added Date',
+            ...viewContactsData.map(contact => 
+                `"${contact.contact_name || ''}","${contact.contact_number}","${new Date(contact.created_at).toLocaleDateString()}"`
+            )
+        ].join('\n');
+
+        // Create and download file
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${listName}_contacts.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+
+        showToast('Contacts exported successfully', 'success');
+    };
+
+    // View contacts search functionality
+    document.getElementById('viewContactSearch')?.addEventListener('input', (e) => {
+        const searchTerm = e.target.value.toLowerCase();
+        const contactCards = document.querySelectorAll('#viewContactsList .col-md-6');
+        
+        contactCards.forEach(card => {
+            const contactName = card.querySelector('h6').textContent.toLowerCase();
+            const contactNumber = card.querySelector('small').textContent.toLowerCase();
+            
+            if (contactName.includes(searchTerm) || contactNumber.includes(searchTerm)) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
     });
 
     // Message length counter
@@ -805,28 +1677,22 @@
         }
         
         contactsToAdd.forEach((contact, index) => {
-            const contactDiv = document.createElement('div');
-            contactDiv.className = 'contact-item';
-            contactDiv.innerHTML = `
-                <div class="flex-grow-1">
-                    <span class="fw-medium">${contact.name}</span>
-                    <small class="text-muted ms-2">${contact.number}</small>
+            const contactItem = document.createElement('div');
+            contactItem.className = 'd-flex justify-content-between align-items-center p-2 border rounded mb-2';
+            contactItem.innerHTML = `
+                <div>
+                    <div class="fw-medium">${contact.name}</div>
+                    <small class="text-muted">${contact.number}</small>
                 </div>
-                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeContactFromList(${index})">
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeContact(${index})">
                     <i class="bi bi-x"></i>
                 </button>
             `;
-            container.appendChild(contactDiv);
+            container.appendChild(contactItem);
         });
-        
-        // Add summary
-        const summary = document.createElement('div');
-        summary.className = 'mt-2 text-center';
-        summary.innerHTML = `<small class="text-muted">${contactsToAdd.length} contacts ready to add</small>`;
-        container.appendChild(summary);
     };
 
-    const removeContactFromList = (index) => {
+    const removeContact = (index) => {
         contactsToAdd.splice(index, 1);
         renderContactsList();
     };
@@ -879,15 +1745,24 @@
         
         const submitBtn = e.target.querySelector('button[type="submit"]');
         const originalText = submitBtn.innerHTML;
-        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Sending...';
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Checking...';
         submitBtn.disabled = true;
         
-        const campaignName = document.getElementById('campaignName').value;
-        const listId = document.getElementById('broadcastList').value;
-        const messageContent = document.getElementById('messageContent').value;
-        const delay = document.getElementById('sendDelay').value;
-        
         try {
+            // Check client status first
+            const clientReady = await checkClientStatus();
+            if (!clientReady) {
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+                return;
+            }
+            
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Sending...';
+            
+            const campaignName = document.getElementById('campaignName').value;
+            const listId = document.getElementById('broadcastList').value;
+            const messageContent = document.getElementById('messageContent').value;
+            const delay = document.getElementById('sendDelay').value;
             const response = await apiCall(`/api/whatsapp/${currentSessionId}/broadcast/send`, {
                 method: 'POST',
                 body: JSON.stringify({
@@ -1016,8 +1891,478 @@
             
             // Initialize empty contacts list
             renderContactsList();
+            
+            // Add modal close event listeners
+            document.getElementById('editListModal').addEventListener('hidden.bs.modal', () => {
+                // Clear form and sections when modal is closed
+                document.getElementById('editListForm').reset();
+                document.getElementById('addContactsSection').style.display = 'none';
+                document.getElementById('removeContactsSection').style.display = 'none';
+                document.getElementById('editContactsList').innerHTML = '';
+                document.getElementById('existingContactsList').innerHTML = '';
+            });
         }
     });
+
+    // Edit broadcast list function
+    const editBroadcastList = async (listId) => {
+        try {
+            // Check if session is selected
+            if (!currentSessionId) {
+                showToast('Please select a WhatsApp session first', 'warning');
+                return;
+            }
+
+            // Find the list data
+            const list = broadcastLists.find(l => l.id === listId);
+            if (!list) {
+                showToast('List not found', 'error');
+                return;
+            }
+
+            // Show loading state
+            showToast('Loading list details...', 'info');
+
+            // Reset contacts to add array
+            contactsToAdd = [];
+            
+            // Populate the edit modal
+            document.getElementById('editListId').value = listId;
+            document.getElementById('editListName').value = list.name;
+            document.getElementById('editListDescription').value = list.description || '';
+
+            // Load existing contacts for this list
+            await loadExistingContacts(listId);
+
+            // Show the modal
+            new bootstrap.Modal(document.getElementById('editListModal')).show();
+        } catch (error) {
+            console.error('Error opening edit modal:', error);
+            showToast('Failed to open edit modal', 'error');
+        }
+    };
+
+    // Load existing contacts for edit
+    const loadExistingContacts = async (listId) => {
+        try {
+            const response = await apiCall(`/api/whatsapp/${currentSessionId}/broadcast/lists/${listId}/contacts`);
+            const data = await response.json();
+            
+            if (data.success) {
+                const contacts = data.data.contacts;
+                renderExistingContacts(contacts);
+            } else {
+                throw new Error(data.message || 'Failed to load contacts');
+            }
+        } catch (error) {
+            console.error('Error loading existing contacts:', error);
+            showToast('Failed to load existing contacts: ' + error.message, 'error');
+        }
+    };
+
+    // Render existing contacts for removal
+    const renderExistingContacts = (contacts) => {
+        const container = document.getElementById('existingContactsList');
+        container.innerHTML = '';
+        
+        if (contacts.length === 0) {
+            container.innerHTML = '<p class="text-muted mb-0">No contacts in this list</p>';
+            return;
+        }
+
+        contacts.forEach(contact => {
+            const contactItem = document.createElement('div');
+            contactItem.className = 'contact-item-edit d-flex justify-content-between align-items-center';
+            contactItem.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <div class="form-check contact-checkbox">
+                        <input class="form-check-input" type="checkbox" value="${contact.contact_number}" id="remove_${contact.contact_number}">
+                    </div>
+                    <div>
+                        <div class="fw-medium">${contact.contact_name}</div>
+                        <small class="text-muted">${contact.contact_number}</small>
+                    </div>
+                </div>
+                <span class="badge bg-light text-dark">Select to remove</span>
+            `;
+            container.appendChild(contactItem);
+        });
+        
+        // Add select all/none buttons
+        const buttonContainer = document.createElement('div');
+        buttonContainer.className = 'd-flex gap-2 mt-3';
+        buttonContainer.innerHTML = `
+            <button type="button" class="btn btn-sm btn-outline-warning" onclick="selectAllContacts()">
+                <i class="bi bi-check-all me-1"></i>Select All
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="deselectAllContacts()">
+                <i class="bi bi-x-circle me-1"></i>Deselect All
+            </button>
+        `;
+        container.appendChild(buttonContainer);
+    };
+
+    // Render edit contacts list (for adding new contacts in edit mode)
+    const renderEditContactsList = () => {
+        const container = document.getElementById('editContactsList');
+        
+        if (contactsToAdd.length === 0) {
+            container.innerHTML = '<p class="text-muted mb-0">No new contacts added yet</p>';
+            return;
+        }
+        
+        container.innerHTML = '';
+        
+        contactsToAdd.forEach((contact, index) => {
+            const contactItem = document.createElement('div');
+            contactItem.className = 'd-flex align-items-center justify-content-between p-2 border rounded mb-2';
+            contactItem.innerHTML = `
+                <div>
+                    <strong>${contact.name}</strong>
+                    <br><small class="text-muted">${contact.number}</small>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeContactFromEditList(${index})">
+                    <i class="bi bi-trash"></i>
+                </button>
+            `;
+            container.appendChild(contactItem);
+        });
+    };
+
+    // Remove contact from edit list
+    const removeContactFromEditList = (index) => {
+        contactsToAdd.splice(index, 1);
+        renderEditContactsList();
+    };
+
+    // Add contacts to existing list via API
+    const addContactsToExistingList = async (listId, contacts) => {
+        try {
+            showToast('Adding contacts to list...', 'info');
+            
+            const response = await apiCall(`/api/whatsapp/${currentSessionId}/broadcast/lists/${listId}/contacts`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ contacts })
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                showToast(`Successfully added ${contacts.length} contacts to list`, 'success');
+                
+                // Refresh the existing contacts list in edit modal
+                await loadExistingContacts();
+                
+                // Close the contact selector modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('contactSelectorModal'));
+                modal.hide();
+            } else {
+                showToast(data.message || 'Failed to add contacts to list', 'error');
+            }
+        } catch (error) {
+            console.error('Error adding contacts to list:', error);
+            showToast('Failed to add contacts to list', 'error');
+        }
+    };
+
+    // Show add contacts section
+    const showAddContactsSection = () => {
+        document.getElementById('addContactsSection').style.display = 'block';
+        document.getElementById('removeContactsSection').style.display = 'none';
+        
+        // Clear previous data
+        document.getElementById('editContactsList').innerHTML = '';
+        document.getElementById('editContactNumber').value = '';
+        document.getElementById('editContactName').value = '';
+        document.getElementById('editContactsTextarea').value = '';
+    };
+
+    // Reset edit modal when closed
+    document.getElementById('editListModal').addEventListener('hidden.bs.modal', () => {
+        contactsToAdd = [];
+        document.getElementById('editContactsList').innerHTML = '';
+    });
+
+    // Reset view contacts modal when closed
+    document.getElementById('viewContactsModal').addEventListener('hidden.bs.modal', () => {
+        currentViewListId = null;
+        viewContactsData = [];
+        document.getElementById('viewContactsList').innerHTML = '';
+        document.getElementById('viewContactSearch').value = '';
+    });
+
+    // Show remove contacts section
+    const showRemoveContactsSection = () => {
+        document.getElementById('addContactsSection').style.display = 'none';
+        document.getElementById('removeContactsSection').style.display = 'block';
+    };
+
+    // Select all contacts for removal
+    const selectAllContacts = () => {
+        const checkboxes = document.querySelectorAll('#existingContactsList input[type="checkbox"]');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = true;
+        });
+    };
+
+    // Deselect all contacts
+    const deselectAllContacts = () => {
+        const checkboxes = document.querySelectorAll('#existingContactsList input[type="checkbox"]');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = false;
+        });
+    };
+
+    // Clean duplicate contacts
+    const cleanDuplicateContacts = async () => {
+        try {
+            const listId = document.getElementById('editListId').value;
+            
+            if (!listId) {
+                showToast('No list selected', 'warning');
+                return;
+            }
+
+            const confirmed = confirm('Are you sure you want to clean duplicate contacts? This action cannot be undone.');
+            if (!confirmed) return;
+
+            const response = await apiCall(`/api/whatsapp/${currentSessionId}/broadcast/lists/${listId}/clean-duplicates`, {
+                method: 'POST'
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                showToast(`Successfully cleaned ${data.data.removedCount} duplicate contacts`, 'success');
+                
+                // Reload existing contacts
+                await loadExistingContacts(listId);
+                
+                // Refresh lists
+                loadBroadcastLists();
+                updateBroadcastListSelect();
+            } else {
+                showToast(data.message || 'Failed to clean duplicate contacts', 'error');
+            }
+        } catch (error) {
+            console.error('Error cleaning duplicate contacts:', error);
+            showToast('Failed to clean duplicate contacts', 'error');
+        }
+    };
+
+    // Add contact to edit list
+    const addContactToEditList = () => {
+        const number = document.getElementById('editContactNumber').value.trim();
+        const name = document.getElementById('editContactName').value.trim();
+        
+        if (!number) {
+            showToast('Contact number is required', 'warning');
+            return;
+        }
+        
+        const cleanNumber = number.replace(/\D/g, '');
+        if (cleanNumber.length < 10) {
+            showToast('Invalid phone number', 'warning');
+            return;
+        }
+        
+        // Check if contact already exists
+        const exists = contactsToAdd.find(c => c.number === cleanNumber);
+        if (exists) {
+            showToast('Contact already added', 'warning');
+            return;
+        }
+        
+        contactsToAdd.push({
+            number: cleanNumber,
+            name: name || cleanNumber
+        });
+        
+        renderEditContactsList();
+        
+        // Clear inputs
+        document.getElementById('editContactNumber').value = '';
+        document.getElementById('editContactName').value = '';
+    };
+
+    // Parse contacts from edit textarea
+    const parseContactsFromEditTextarea = () => {
+        const textarea = document.getElementById('editContactsTextarea').value.trim();
+        if (!textarea) return;
+        
+        const lines = textarea.split('\n');
+        let added = 0;
+        
+        lines.forEach(line => {
+            const parts = line.trim().split(',');
+            if (parts.length >= 1) {
+                const number = parts[0].replace(/\D/g, '');
+                const name = parts[1] ? parts[1].trim() : number;
+                
+                if (number.length >= 10) {
+                    const exists = contactsToAdd.find(c => c.number === number);
+                    if (!exists) {
+                        contactsToAdd.push({ number, name });
+                        added++;
+                    }
+                }
+            }
+        });
+        
+        if (added > 0) {
+            renderEditContactsList();
+            document.getElementById('editContactsTextarea').value = '';
+            showToast(`${added} contacts added`, 'success');
+        } else {
+            showToast('No new contacts added', 'warning');
+        }
+    };
+
+    // Handle edit list form submission
+    document.getElementById('editListForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Updating...';
+        submitBtn.disabled = true;
+        
+        try {
+            const listId = document.getElementById('editListId').value;
+            const listName = document.getElementById('editListName').value.trim();
+            const listDescription = document.getElementById('editListDescription').value.trim();
+            
+            if (!listName) {
+                showToast('List name is required', 'warning');
+                return;
+            }
+
+            // Get contacts to add from the global contactsToAdd array
+            const contactsToAdd = contactsToAdd || [];
+
+            // Get contacts to remove
+            const contactsToRemove = [];
+            const checkboxes = document.querySelectorAll('#existingContactsList input[type="checkbox"]:checked');
+            checkboxes.forEach(checkbox => {
+                contactsToRemove.push(checkbox.value);
+            });
+
+            // Show confirmation with summary
+            const summary = [];
+            if (contactsToAdd.length > 0) summary.push(`Add ${contactsToAdd.length} new contacts`);
+            if (contactsToRemove.length > 0) summary.push(`Remove ${contactsToRemove.length} contacts`);
+            
+            // Check if list details changed
+            const listToCheck = broadcastLists.find(l => l.id == listId);
+            if (listToCheck && (listName !== listToCheck.name || listDescription !== (listToCheck.description || ''))) {
+                summary.push('Update list details');
+            }
+            
+            if (summary.length === 0) {
+                showToast('No changes detected', 'warning');
+                return;
+            }
+
+            const confirmed = confirm(`Are you sure you want to:\n${summary.join('\n')}?`);
+            if (!confirmed) return;
+
+            // Update list details if changed
+            const listToUpdate = broadcastLists.find(l => l.id == listId);
+            if (listToUpdate && (listName !== listToUpdate.name || listDescription !== (listToUpdate.description || ''))) {
+                const updateResponse = await apiCall(`/api/whatsapp/${currentSessionId}/broadcast/lists/${listId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        name: listName,
+                        description: listDescription
+                    })
+                });
+
+                const updateData = await updateResponse.json();
+                
+                if (!updateData.success) {
+                    throw new Error(updateData.message || 'Failed to update list');
+                }
+            }
+
+            // Add new contacts if any
+            if (contactsToAdd.length > 0) {
+                const addResponse = await apiCall(`/api/whatsapp/${currentSessionId}/broadcast/lists/${listId}/contacts`, {
+                    method: 'POST',
+                    body: JSON.stringify({ contacts: contactsToAdd })
+                });
+
+                const addData = await addResponse.json();
+                if (!addData.success) {
+                    console.warn('Failed to add some contacts:', addData.message);
+                }
+            }
+
+            // Remove contacts if any
+            if (contactsToRemove.length > 0) {
+                const removeResponse = await apiCall(`/api/whatsapp/${currentSessionId}/broadcast/lists/${listId}/contacts`, {
+                    method: 'DELETE',
+                    body: JSON.stringify({ contactNumbers: contactsToRemove })
+                });
+
+                const removeData = await removeResponse.json();
+                if (!removeData.success) {
+                    console.warn('Failed to remove some contacts:', removeData.message);
+                }
+            }
+
+            // Close modal and refresh data
+            bootstrap.Modal.getInstance(document.getElementById('editListModal')).hide();
+            document.getElementById('editListForm').reset();
+            
+            // Clear sections
+            document.getElementById('addContactsSection').style.display = 'none';
+            document.getElementById('removeContactsSection').style.display = 'none';
+            document.getElementById('editContactsList').innerHTML = '';
+            document.getElementById('existingContactsList').innerHTML = '';
+
+            // Refresh lists and campaigns
+            loadBroadcastLists();
+            loadBroadcastCampaigns();
+            updateBroadcastListSelect();
+            
+            showToast('Broadcast list updated successfully', 'success');
+            
+        } catch (error) {
+            console.error('Error updating broadcast list:', error);
+            showToast(error.message || 'Failed to update broadcast list', 'error');
+        } finally {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }
+    });
+
+    // Delete broadcast list
+    const deleteBroadcastList = async (listId, listName) => {
+        try {
+            const confirmed = confirm(`Are you sure you want to delete the broadcast list "${listName}"? This action cannot be undone.`);
+            if (!confirmed) return;
+
+            const response = await apiCall(`/api/whatsapp/${currentSessionId}/broadcast/lists/${listId}`, {
+                method: 'DELETE'
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                showToast(`Broadcast list "${listName}" deleted successfully`, 'success');
+                loadBroadcastLists();
+                updateBroadcastListSelect();
+            } else {
+                showToast(data.message || 'Failed to delete broadcast list', 'error');
+            }
+        } catch (error) {
+            console.error('Error deleting broadcast list:', error);
+            showToast('Failed to delete broadcast list', 'error');
+        }
+    };
 
     // Auto-refresh campaigns every 30 seconds
     setInterval(() => {

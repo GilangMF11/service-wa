@@ -1,5 +1,11 @@
 // chatController.js
 const clients = require('../../clients');
+const { 
+    extractMessageId, 
+    extractChatId, 
+    sendMessageWithErrorHandling, 
+    getSuccessMessage 
+} = require('../../utils/whatsappHelpers');
 
 // Get chat history with a contact
 const getChatHistory = async (req, res) => {
@@ -30,12 +36,12 @@ const getChatHistory = async (req, res) => {
         res.status(200).json({
             success: true,
             contact: {
-                id: chat.id._serialized,
+                id: extractChatId(chat),
                 name: chat.name,
                 isGroup: chat.isGroup
             },
             messages: messages.map(msg => ({
-                id: msg.id.id,
+                id: extractMessageId(msg),
                 body: msg.body,
                 fromMe: msg.fromMe,
                 author: msg.author || null, // ID pengirim (penting untuk grup)
@@ -73,7 +79,7 @@ const getAllChats = async (req, res) => {
         res.status(200).json({
             success: true,
             chats: chats.map(chat => ({
-                id: chat.id._serialized,
+                id: extractChatId(chat),
                 name: chat.name,
                 isGroup: chat.isGroup,
                 timestamp: chat.timestamp,
@@ -110,7 +116,8 @@ const sendMessage = async (req, res) => {
             });
         }
 
-        const result = await clients[sessionId].client.sendMessage(contactId, message);
+        const result = await sendMessageWithErrorHandling(clients[sessionId].client, contactId, message);
+        const { messageId, timestamp } = result;
 
         // Emit pesan ke Socket.IO (real-time)
         const { getIO } = require('../../socket');
@@ -119,16 +126,16 @@ const sendMessage = async (req, res) => {
             contactId,
             message,
             fromMe: true,
-            timestamp: result.timestamp,
-            id: result.id.id
+            timestamp: timestamp,
+            id: messageId
         });
 
         res.status(200).json({
             success: true,
-            message: 'Pesan berhasil dikirim',
+            message: getSuccessMessage(messageId),
             data: {
-                id: result.id.id,
-                timestamp: result.timestamp
+                id: messageId,
+                timestamp: timestamp
             }
         });
     } catch (error) {
