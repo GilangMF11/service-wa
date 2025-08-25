@@ -181,12 +181,19 @@ const createWhatsAppClient = async (sessionRecord) => {
                     messageId = 'unknown';
                 }
 
-                io.to(session_id).emit('receive-message', {
+                // Emit to socket.io room for real-time updates
+                io.to(`session-${session_id}`).emit('new-message', {
                     contactId: msg.from,
                     message: msg.body,
                     fromMe: false,
                     timestamp: msg.timestamp,
-                    id: messageId
+                    id: messageId,
+                    sessionId: session_id
+                });
+                
+                console.log(`📨 Real-time message emitted for session ${session_id}:`, {
+                    from: msg.from,
+                    message: msg.body.substring(0, 50) + '...'
                 });
             }
         } catch (err) {

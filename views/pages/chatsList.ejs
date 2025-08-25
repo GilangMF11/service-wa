@@ -84,16 +84,51 @@
     }
     
     .unread-badge {
+      position: absolute;
+      top: -5px;
+      right: -5px;
       width: 20px;
       height: 20px;
       border-radius: 50%;
-      background-color: var(--primary-color);
+      background-color: #dc3545;
       color: white;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: bold;
+      border: 2px solid white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+    
+    .avatar-container {
+      position: relative;
+      display: inline-block;
+    }
+    
+    .message-status {
+      font-size: 10px;
+      color: #6c757d;
+      margin-top: 2px;
+    }
+    
+    .status-delivered {
+      color: #28a745;
+    }
+    
+    .status-read {
+      color: #007bff;
+    }
+    
+    .status-sent {
+      color: #6c757d;
     }
     
     .time-badge {
@@ -204,20 +239,52 @@
     const token = localStorage.getItem('token');
     const urlParams = new URLSearchParams(window.location.search);
     const sessionId = urlParams.get('id');
+    
+    // Debug: Log session ID
+    console.log('🔍 Session ID from URL:', sessionId);
+    console.log('🔍 Current URL:', window.location.href);
   
-    const socket = io('http://localhost:3000');
-    socket.emit('join-session', sessionId);
-  
-    socket.on('receive-message', (data) => {
-      if (data.contactId === currentContactId) {
-        loadChatMessages(currentContactId, currentContactName);
-        playNotificationSound();
+    // Initialize WebSocket connection
+    let socket;
+    
+    function initWebSocket() {
+      // Get socket.io from CDN or local
+      if (typeof io !== 'undefined') {
+        socket = io();
+        
+        socket.on('connect', () => {
+          console.log('🔌 WebSocket connected:', socket.id);
+          // Join session room
+          socket.emit('join-session', sessionId);
+          showToast('Real-time connection established!', 'success');
+        });
+        
+        socket.on('disconnect', () => {
+          console.log('🔌 WebSocket disconnected');
+          showToast('Real-time connection lost. Reconnecting...', 'warning');
+        });
+        
+        socket.on('new-message', (messageData) => {
+          console.log('📨 Real-time message received:', messageData);
+          handleRealTimeMessage(messageData);
+        });
+        
+        socket.on('message-status', (statusData) => {
+          console.log('📊 Message status update:', statusData);
+          updateMessageStatus(statusData);
+        });
+        
       } else {
-        // Update chat list to show new message indicator
-        loadChatList();
+        console.warn('⚠️ Socket.io not available, falling back to auto-refresh');
+        // Fallback to auto-refresh if WebSocket not available
+        if (currentContactId) {
+          startAutoRefresh(currentContactId);
+        } else {
+          console.log('📱 No contact selected yet, auto-refresh will start when chat is opened');
+        }
       }
-    });
-  
+    }
+    
     function playNotificationSound() {
       const audio = new Audio('/assets/sounds/message.mp3');
       audio.play();
@@ -225,6 +292,7 @@
   
     let currentContactId = null;
     let currentContactName = null;
+    let currentSessionId = sessionId; // Add this line
     let allChats = [];
   
     async function loadChatList() {
@@ -281,8 +349,11 @@
         const initial = (chat.name || '?')[0].toUpperCase();
         
         item.innerHTML = `
-          <div class="avatar-image">
-            ${initial}
+          <div class="avatar-container position-relative">
+            <div class="avatar-image">
+              ${initial}
+            </div>
+            <!-- Unread badge will be added here dynamically -->
           </div>
           <div class="ms-3 item-desc flex-grow-1">
             <div class="w-100 d-flex align-items-center justify-content-between">
@@ -294,12 +365,15 @@
               </div>
             </div>
             <div class="d-flex justify-content-between align-items-center mt-1">
-              <p class="small text-muted mb-0 text-truncate" style="max-width: 85%;">
+              <p class="small text-muted mb-0 text-truncate last-message" style="max-width: 85%;">
                 ${chat.id}
               </p>
             </div>
           </div>
         `;
+        
+        // Add data attribute for easy selection
+        item.setAttribute('data-contact-id', chat.id);
         
         item.onclick = () => {
           document.querySelectorAll('.single-item').forEach(el => el.classList.remove('active'));
@@ -318,8 +392,22 @@
     }
   
     async function loadChatMessages(contactId, contactName) {
+      // Stop auto-refresh for previous chat
+      stopAutoRefresh();
+      
+      // Clear unread indicator for this contact
+      clearUnreadIndicator(contactId);
+      
       currentContactId = contactId;
       currentContactName = contactName;
+      currentSessionId = sessionId; // Ensure currentSessionId is set
+      
+      console.log('📱 Chat loaded:', {
+        contactId,
+        contactName,
+        currentSessionId,
+        sessionId
+      });
       
       const panel = document.getElementById('chat-panel');
       panel.innerHTML = `
@@ -371,13 +459,26 @@
         }
   
         panel.innerHTML = `
-          <div class="chat-header">
-            <div class="avatar-image me-3">
-              ${(contactName || '?')[0].toUpperCase()}
+          <div class="chat-header d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center">
+              <div class="avatar-image me-3">
+                ${(contactName || '?')[0].toUpperCase()}
+              </div>
+              <div>
+                <h6 class="mb-0 fw-bold">${contactName || 'Tanpa Nama'}</h6>
+                <div class="small text-muted">${contactId}</div>
+              </div>
             </div>
-            <div>
-              <h6 class="mb-0 fw-bold">${contactName || 'Tanpa Nama'}</h6>
-              <div class="small text-muted">${contactId}</div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-sm btn-outline-primary" onclick="refreshChatMessages('${contactId}')" title="Refresh messages">
+                <i class="bi bi-arrow-clockwise"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-secondary" onclick="toggleAutoRefresh()" id="autoRefreshToggle" title="Toggle auto-refresh">
+                <i class="bi bi-play-fill"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-info" onclick="testUnreadIndicator('${contactId}')" title="Test unread indicator">
+                <i class="bi bi-bell"></i>
+              </button>
             </div>
           </div>
           
@@ -417,6 +518,19 @@
           const messagesContainer = document.getElementById('messages-container');
           if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }, 100);
+        
+        // Start auto-refresh for this chat (fallback)
+        startAutoRefresh(contactId);
+        
+        // Join session room for real-time updates
+        if (socket && socket.connected) {
+          socket.emit('join-session', sessionId);
+          console.log('📱 Joined session room:', sessionId);
+        }
+        
+        // Debug: Log current state
+        console.log('✅ Chat loaded for:', contactId);
+        console.log('🔄 Auto-refresh started for:', contactId);
   
       } catch (err) {
         console.error(err);
@@ -437,6 +551,12 @@
       if (!message.trim()) return;
   
       try {
+        // Show sending indicator
+        const sendButton = input.nextElementSibling;
+        const originalIcon = sendButton.innerHTML;
+        sendButton.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+        sendButton.disabled = true;
+  
         const res = await fetch(`/api/whatsapp/${sessionId}/chats/${contactId}`, {
           method: 'POST',
           headers: {
@@ -448,15 +568,259 @@
   
         const data = await res.json();
         if (data.success) {
+          // Clear input
           input.value = '';
           input.style.height = 'auto';
-          loadChatMessages(contactId, currentContactName);
+          
+          // Add sent message to UI immediately (optimistic update)
+          addMessageToUI(contactId, message, true, Date.now());
+          
+          // Refresh messages to get any replies
+          setTimeout(() => {
+            refreshChatMessages(contactId);
+          }, 1000);
+          
+          // Update chat list to show latest message
+          updateChatListWithLatestMessage(contactId, message);
         } else {
-          alert(data.message || 'Gagal mengirim pesan');
+          showToast(data.message || 'Gagal mengirim pesan', 'error');
         }
       } catch (err) {
         console.error(err);
-        alert('Terjadi kesalahan saat mengirim pesan');
+        showToast('Terjadi kesalahan saat mengirim pesan', 'error');
+      } finally {
+        // Restore send button
+        const sendButton = input.nextElementSibling;
+        sendButton.innerHTML = '<i class="bi bi-send-fill"></i>';
+        sendButton.disabled = false;
+      }
+    }
+    
+    // Add message to UI immediately (optimistic update)
+    function addMessageToUI(contactId, message, isFromMe, timestamp) {
+      const messagesContainer = document.getElementById('messages-container');
+      if (!messagesContainer) return;
+      
+      const time = new Date(timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      const messageHTML = `
+        <div class="message-bubble ${isFromMe ? 'me' : 'them'}">
+          <div class="message-content">${message}</div>
+          <div class="message-time">${time}</div>
+        </div>
+      `;
+      
+      messagesContainer.insertAdjacentHTML('beforeend', messageHTML);
+      
+      // Scroll to bottom
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+    
+    // Refresh chat messages without full reload
+    async function refreshChatMessages(contactId) {
+      try {
+        console.log('🔄 Refreshing messages for contact:', contactId);
+        
+        const res = await fetch(`/api/whatsapp/${sessionId}/chats/${contactId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+  
+        if (data.success && data.messages.length > 0) {
+          // Get current messages count
+          const currentMessages = document.querySelectorAll('#messages-container .message-bubble');
+          const newMessagesCount = data.messages.length - currentMessages.length;
+          
+          console.log(`📊 Current messages: ${currentMessages.length}, Total from API: ${data.messages.length}, New: ${newMessagesCount}`);
+          
+          if (newMessagesCount > 0) {
+            // Add only new messages
+            const messagesContainer = document.getElementById('messages-container');
+            const newMessages = data.messages.slice(-newMessagesCount);
+            
+            console.log('📨 Adding new messages:', newMessages);
+            
+            newMessages.forEach(msg => {
+              const time = new Date(msg.timestamp * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+              const messageHTML = `
+                <div class="message-bubble ${msg.fromMe ? 'me' : 'them'}">
+                  <div class="message-content">${msg.body}</div>
+                  <div class="message-time">${time}</div>
+                </div>
+              `;
+              messagesContainer.insertAdjacentHTML('beforeend', messageHTML);
+            });
+            
+            // Scroll to bottom for new messages
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            // Show notification for new messages
+            if (newMessages.some(msg => !msg.fromMe)) {
+              showToast('Pesan baru diterima!', 'info');
+              // Update chat list to show unread indicator
+              updateChatListUnreadIndicator(contactId, true);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error refreshing messages:', err);
+      }
+    }
+    
+    // Update chat list with latest message
+    function updateChatListWithLatestMessage(contactId, message) {
+      const chatItem = document.querySelector(`[data-contact-id="${contactId}"]`);
+      if (chatItem) {
+        const lastMessageElement = chatItem.querySelector('.last-message');
+        if (lastMessageElement) {
+          lastMessageElement.textContent = message.length > 30 ? message.substring(0, 30) + '...' : message;
+        }
+        
+        const timeElement = chatItem.querySelector('.time-badge');
+        if (timeElement) {
+          timeElement.textContent = 'now';
+        }
+        
+        // Update last message time
+        const lastMessageTime = chatItem.querySelector('.last-message-time');
+        if (lastMessageTime) {
+          lastMessageTime.textContent = 'now';
+        }
+      }
+    }
+    
+    // Update unread indicator in chat list
+    function updateChatListUnreadIndicator(contactId, hasUnread) {
+      const chatItem = document.querySelector(`[data-contact-id="${contactId}"]`);
+      if (chatItem) {
+        let unreadBadge = chatItem.querySelector('.unread-badge');
+        
+        if (hasUnread && !unreadBadge) {
+          // Create unread badge if it doesn't exist
+          unreadBadge = document.createElement('div');
+          unreadBadge.className = 'unread-badge';
+          unreadBadge.textContent = '1';
+          
+          // Add to chat item
+          const avatarContainer = chatItem.querySelector('.avatar-container');
+          if (avatarContainer) {
+            avatarContainer.appendChild(unreadBadge);
+          }
+        } else if (unreadBadge && !hasUnread) {
+          // Remove unread badge if no unread messages
+          unreadBadge.remove();
+        } else if (unreadBadge && hasUnread) {
+          // Update unread count
+          const currentCount = parseInt(unreadBadge.textContent) || 0;
+          unreadBadge.textContent = currentCount + 1;
+        }
+      }
+    }
+    
+    // Clear unread indicator when chat is opened
+    function clearUnreadIndicator(contactId) {
+      updateChatListUnreadIndicator(contactId, false);
+    }
+    
+    // Test function for unread indicator
+    function testUnreadIndicator(contactId) {
+      console.log('🧪 Testing unread indicator for:', contactId);
+      updateChatListUnreadIndicator(contactId, true);
+      showToast('Test: Unread indicator added!', 'info');
+    }
+    
+
+    
+    // Handle real-time incoming messages
+    function handleRealTimeMessage(messageData) {
+      const { contactId, message, fromMe, timestamp, sessionId } = messageData;
+      
+      console.log('📨 handleRealTimeMessage called with:', {
+        contactId,
+        message: message.substring(0, 50) + '...',
+        fromMe,
+        timestamp,
+        sessionId,
+        currentSessionId,
+        currentContactId
+      });
+      
+      // Check if this message is for current session
+      if (sessionId !== currentSessionId) {
+        console.log('📱 Message for different session, ignoring');
+        return;
+      }
+      
+      // Check if this message is for current contact
+      if (contactId === currentContactId) {
+        // Add message to current chat
+        addMessageToUI(contactId, message, fromMe, timestamp * 1000);
+        showToast('Pesan baru diterima!', 'info');
+      } else {
+        // Update unread indicator for other contacts
+        updateChatListUnreadIndicator(contactId, true);
+        showToast(`Pesan baru dari ${contactId}`, 'info');
+      }
+      
+      // Update chat list with latest message
+      updateChatListWithLatestMessage(contactId, message);
+    }
+    
+    // Update message status (delivered, read, etc.)
+    function updateMessageStatus(statusData) {
+      const { messageId, status } = statusData;
+      const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
+      
+      if (messageElement) {
+        const statusElement = messageElement.querySelector('.message-status');
+        if (statusElement) {
+          statusElement.textContent = status;
+          statusElement.className = `message-status status-${status}`;
+        }
+      }
+    }
+    
+    // Auto-refresh messages every 10 seconds (fallback)
+    let autoRefreshInterval;
+    function startAutoRefresh(contactId) {
+      if (!contactId) {
+        console.warn('⚠️ startAutoRefresh: contactId is undefined');
+        return;
+      }
+      
+      stopAutoRefresh(); // Stop previous interval
+      console.log('🔄 Starting auto-refresh fallback for contact:', contactId);
+      autoRefreshInterval = setInterval(() => {
+        if (currentContactId === contactId) {
+          console.log('⏰ Auto-refresh fallback triggered for:', contactId);
+          refreshChatMessages(contactId);
+        }
+      }, 10000); // Refresh every 10 seconds as fallback
+    }
+    
+    function stopAutoRefresh() {
+      if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+      }
+    }
+    
+    // Toggle auto-refresh on/off
+    function toggleAutoRefresh() {
+      const toggleBtn = document.getElementById('autoRefreshToggle');
+      if (!toggleBtn) return;
+      
+      if (autoRefreshInterval) {
+        stopAutoRefresh();
+        toggleBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
+        toggleBtn.className = 'btn btn-sm btn-outline-secondary';
+        toggleBtn.title = 'Enable auto-refresh';
+        showToast('Auto-refresh disabled', 'info');
+      } else {
+        startAutoRefresh(currentContactId);
+        toggleBtn.innerHTML = '<i class="bi bi-pause-fill"></i>';
+        toggleBtn.className = 'btn btn-sm btn-outline-warning';
+        toggleBtn.title = 'Disable auto-refresh';
+        showToast('Auto-refresh enabled', 'success');
       }
     }
     
@@ -480,8 +844,48 @@
       });
     }
   
+    // Toast notification function
+    function showToast(message, type = 'info') {
+      // Create toast container if not exists
+      let toastContainer = document.querySelector('.toast-container');
+      if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+        toastContainer.style.zIndex = '9999';
+        document.body.appendChild(toastContainer);
+      }
+      
+      // Create toast element
+      const toastEl = document.createElement('div');
+      toastEl.className = `toast show bg-${type === 'error' ? 'danger' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'info'} text-white`;
+      toastEl.innerHTML = `
+        <div class="toast-header">
+          <strong class="me-auto">${type.charAt(0).toUpperCase() + type.slice(1)}</strong>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body">
+          ${message}
+        </div>
+      `;
+      
+      toastContainer.appendChild(toastEl);
+      
+      // Auto remove after 3 seconds
+      setTimeout(() => {
+        toastEl.remove();
+      }, 3000);
+      
+      // Manual close
+      toastEl.querySelector('.btn-close').addEventListener('click', () => {
+        toastEl.remove();
+      });
+    }
+    
     document.addEventListener('DOMContentLoaded', () => {
       loadChatList();
       setupSearch();
+      
+      // Initialize WebSocket connection
+      initWebSocket();
     });
   </script>
