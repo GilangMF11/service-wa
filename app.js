@@ -1,6 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const fs = require('fs');
 const path = require('path');
@@ -30,7 +30,8 @@ validateConfig();
 
 // Inisialisasi Express
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Session middleware
 const session = require('express-session');
@@ -610,6 +611,7 @@ app.post('/api/whatsapp/:sessionId/chats/:contactId', async (req, res) => {
         console.log('🔍 Client object keys:', clients[sessionId] ? Object.keys(clients[sessionId]) : 'N/A');
         console.log('🔍 Client ready state:', clients[sessionId]?.isReady);
         console.log('🔍 Client connection state:', clients[sessionId]?.client?.pupPage ? 'Page exists' : 'No page');
+        console.log('📁 File details:', { fileName, fileType, messageLength: message?.length || 0 });
         
         if (!message) {
             return res.status(400).json({
@@ -819,6 +821,248 @@ app.post('/api/whatsapp/:sessionId/chats/:contactId', async (req, res) => {
 });
 
 
+
+// Endpoint untuk mengirim file (gambar/dokumen)
+app.post('/api/whatsapp/:sessionId/chats/:contactId/file', async (req, res) => {
+    try {
+        const { sessionId, contactId } = req.params;
+        const { message, fileType, fileName, fileData } = req.body;
+        const userId = req.user.id;
+        
+        console.log('🚀 POST /api/whatsapp/:sessionId/chats/:contactId/file called');
+        console.log('🔗 Session ID:', sessionId);
+        console.log('👤 Contact ID:', contactId);
+        console.log('👤 User ID:', userId);
+        console.log('📁 File Type:', fileType);
+        console.log('📁 File Name:', fileName);
+        
+        if (!fileData || !fileType) {
+            return res.status(400).json({
+                success: false,
+                message: 'File data dan type diperlukan'
+            });
+        }
+        
+        // Check file size (max 10MB)
+        const fileSizeBytes = Buffer.byteLength(fileData, 'base64');
+        const maxSizeBytes = 10 * 1024 * 1024; // 10MB
+        
+        if (fileSizeBytes > maxSizeBytes) {
+            return res.status(413).json({
+                success: false,
+                message: `File terlalu besar. Maksimal ${(maxSizeBytes / 1024 / 1024).toFixed(1)}MB`,
+                fileSize: (fileSizeBytes / 1024 / 1024).toFixed(2),
+                maxSize: (maxSizeBytes / 1024 / 1024).toFixed(1)
+            });
+        }
+        
+        console.log(`📁 File size: ${(fileSizeBytes / 1024 / 1024).toFixed(2)}MB`);
+        
+        // Validate file type
+        const allowedTypes = [
+            'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'text/plain'
+        ];
+        
+        if (!allowedTypes.includes(fileType)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Tipe file tidak didukung',
+                fileType: fileType,
+                allowedTypes: allowedTypes
+            });
+        }
+        
+        console.log(`✅ File type validated: ${fileType}`);
+        
+        // Cek apakah session ada dan milik user
+        const sessionRecord = await whatsappSessionQueries.getSessionBySessionId(sessionId);
+        if (!sessionRecord || sessionRecord.user_id !== userId) {
+            return res.status(404).json({
+                success: false,
+                message: 'Session tidak ditemukan atau tidak memiliki akses'
+            });
+        }
+        
+        // Cek apakah client ada dan siap
+        if (!clients[sessionId] || !clients[sessionId].isReady) {
+            return res.status(503).json({
+                success: false,
+                message: 'WhatsApp client belum siap. Silakan scan QR code terlebih dahulu.',
+                needScan: true
+            });
+        }
+        
+        // Decode base64 file data
+        const buffer = Buffer.from(fileData, 'base64');
+        
+        // Create temporary file path
+        const tempDir = path.join(__dirname, 'temp');
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+        }
+        
+        const tempFilePath = path.join(tempDir, `${Date.now()}_${fileName}`);
+        fs.writeFileSync(tempFilePath, buffer);
+        
+        try {
+            console.log('📤 Attempting to send file...');
+            
+            // Create a promise that handles the serialize error gracefully
+            const sendFileWithFallback = () => {
+                return new Promise((resolve, reject) => {
+                    // Set a timeout for the entire operation
+                    const timeout = setTimeout(() => {
+                        reject(new Error('Send file timeout after 30 seconds'));
+                    }, 30000);
+                    
+                    // Try to send the file
+                    let sendPromise;
+                    if (fileType.startsWith('image/')) {
+                        // Send as image
+                        const media = MessageMedia.fromFilePath(tempFilePath);
+                        sendPromise = clients[sessionId].client.sendMessage(contactId, media, {
+                            caption: message || ''
+                        });
+                    } else {
+                        // Send as document
+                        const media = MessageMedia.fromFilePath(tempFilePath);
+                        sendPromise = clients[sessionId].client.sendMessage(contactId, media, {
+                            caption: message || ''
+                        });
+                    }
+                    
+                    sendPromise
+                        .then(result => {
+                            clearTimeout(timeout);
+                            console.log('✅ File sent successfully, result:', result);
+                            resolve(result);
+                        })
+                        .catch(error => {
+                            clearTimeout(timeout);
+                            console.log('❌ Send file error:', error.message);
+                            
+                            // Check if it's a serialize error
+                            if (error.message && error.message.includes('serialize')) {
+                                console.log('🔄 Serialize error detected, will verify manually...');
+                                // Don't reject, let the verification process handle it
+                                resolve({ serializeError: true, originalError: error });
+                            } else {
+                                reject(error);
+                            }
+                        });
+                });
+            };
+            
+            const result = await sendFileWithFallback();
+            
+            // If we got a serialize error, verify manually
+            if (result.serializeError) {
+                console.log('🔄 Verifying file delivery after serialize error...');
+                
+                // Wait a bit for the file to be processed
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                
+                try {
+                    const chat = await clients[sessionId].client.getChatById(contactId);
+                    if (chat) {
+                        const recentMessages = await chat.fetchMessages({ limit: 10 });
+                        
+                        // Look for our file message in recent messages
+                        const ourFileMessage = recentMessages.find(msg => 
+                            msg.hasMedia && 
+                            msg.fromMe === true &&
+                            (msg.body === message || !message) // If no caption, just check for media
+                        );
+                        
+                        if (ourFileMessage) {
+                            console.log('✅ File message verified as sent despite serialize error');
+                            res.status(200).json({
+                                success: true,
+                                message: 'File berhasil dikirim (verifikasi manual)',
+                                messageId: 'manual-verification',
+                                timestamp: Date.now(),
+                                fileType: fileType,
+                                fileName: fileName,
+                                note: 'File verified as sent despite serialize error'
+                            });
+                            
+                            // Clean up temp file
+                            if (fs.existsSync(tempFilePath)) {
+                                fs.unlinkSync(tempFilePath);
+                            }
+                            return;
+                        } else {
+                            console.log('❌ File message not found in recent messages');
+                            throw new Error('File message not found in recent messages after serialize error');
+                        }
+                    }
+                } catch (verifyError) {
+                    console.error('❌ Error during manual verification:', verifyError);
+                    throw new Error(`Serialize error and verification failed: ${verifyError.message}`);
+                }
+            }
+            
+            // Normal success case
+            let messageId = null;
+            let timestamp = null;
+            
+            try {
+                if (result && result.id) {
+                    messageId = result.id._serialized || result.id.id || result.id;
+                }
+                if (result && result.timestamp) {
+                    timestamp = result.timestamp;
+                }
+            } catch (serializeError) {
+                console.warn('⚠️ Serialize error on response parsing, but file sent successfully');
+                messageId = 'response-parse-success';
+                timestamp = Date.now();
+            }
+            
+            // Clean up temp file
+            if (fs.existsSync(tempFilePath)) {
+                fs.unlinkSync(tempFilePath);
+            }
+            
+            res.status(200).json({
+                success: true,
+                message: 'File berhasil dikirim',
+                messageId: messageId,
+                timestamp: timestamp,
+                fileType: fileType,
+                fileName: fileName
+            });
+            
+        } catch (sendError) {
+            console.error('❌ Final error in send file:', sendError);
+            
+            // Clean up temp file on error
+            if (fs.existsSync(tempFilePath)) {
+                fs.unlinkSync(tempFilePath);
+            }
+            
+            res.status(500).json({
+                success: false,
+                message: 'Gagal mengirim file',
+                error: sendError.message
+            });
+        }
+        
+    } catch (error) {
+        console.error('Error saat mengirim file:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Gagal mengirim file',
+            error: error.message
+        });
+    }
+});
 
 // Endpoint untuk mendapatkan daftar contacts dalam session
 app.get('/api/whatsapp/:sessionId/contacts', async (req, res) => {
