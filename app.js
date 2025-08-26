@@ -522,14 +522,31 @@ app.get('/api/whatsapp/:sessionId/chats/:contactId', async (req, res) => {
                 name: chat.name,
                 isGroup: chat.isGroup
             },
-            messages: messages.map(msg => ({
-                id: msg.id._serialized,
-                body: msg.body,
-                fromMe: msg.fromMe,
-                author: msg.author || null, // ID pengirim (penting untuk grup)
-                timestamp: msg.timestamp,
-                hasMedia: msg.hasMedia,
-                type: msg.type
+            messages: await Promise.all(messages.map(async (msg) => {
+                let mediaData = null;
+                
+                // Get media data if message has media
+                if (msg.hasMedia) {
+                    try {
+                        const media = await msg.downloadMedia();
+                        if (media && media.data) {
+                            mediaData = media.data;
+                        }
+                    } catch (mediaError) {
+                        console.warn('⚠️ Could not download media for message:', mediaError.message);
+                    }
+                }
+                
+                return {
+                    id: msg.id._serialized,
+                    body: msg.body,
+                    fromMe: msg.fromMe,
+                    author: msg.author || null, // ID pengirim (penting untuk grup)
+                    timestamp: msg.timestamp,
+                    hasMedia: msg.hasMedia,
+                    type: msg.type,
+                    mediaData: mediaData
+                };
             }))
         });
         
@@ -611,7 +628,7 @@ app.post('/api/whatsapp/:sessionId/chats/:contactId', async (req, res) => {
         console.log('🔍 Client object keys:', clients[sessionId] ? Object.keys(clients[sessionId]) : 'N/A');
         console.log('🔍 Client ready state:', clients[sessionId]?.isReady);
         console.log('🔍 Client connection state:', clients[sessionId]?.client?.pupPage ? 'Page exists' : 'No page');
-        console.log('📁 File details:', { fileName, fileType, messageLength: message?.length || 0 });
+        console.log('💬 Message details:', { messageLength: message?.length || 0 });
         
         if (!message) {
             return res.status(400).json({

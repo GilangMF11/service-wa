@@ -39,6 +39,12 @@
     </div>
   </main>
   
+  <!-- Media Viewer Modal -->
+  <div id="mediaViewerModal" class="media-viewer-modal">
+    <span class="media-viewer-close" onclick="closeMediaViewer()">&times;</span>
+    <img id="mediaViewerContent" class="media-viewer-content">
+  </div>
+  
   <style>
     /* General Styling */
     :root {
@@ -295,6 +301,96 @@
       margin-top: 5px;
       font-size: 12px;
       color: #6c757d;
+    }
+    
+    /* Media message styles */
+    .media-message {
+      margin-bottom: 8px;
+    }
+    
+    .message-image {
+      max-width: 200px;
+      max-height: 200px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    
+    .message-image:hover {
+      transform: scale(1.05);
+    }
+    
+    .message-video {
+      max-width: 250px;
+      max-height: 200px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    
+    .message-audio {
+      width: 250px;
+      height: 40px;
+    }
+    
+    .document-preview, .generic-media {
+      display: flex;
+      align-items: center;
+      padding: 12px;
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    
+    .document-preview:hover, .generic-media:hover {
+      background: #e9ecef;
+    }
+    
+    .document-info, .media-info {
+      margin-left: 12px;
+      flex: 1;
+    }
+    
+    .media-caption {
+      margin-top: 8px;
+      font-size: 14px;
+      color: #6c757d;
+      font-style: italic;
+    }
+    
+    /* Media viewer modal */
+    .media-viewer-modal {
+      display: none;
+      position: fixed;
+      z-index: 9999;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.9);
+    }
+    
+    .media-viewer-content {
+      margin: auto;
+      display: block;
+      max-width: 90%;
+      max-height: 90%;
+      margin-top: 5%;
+    }
+    
+    .media-viewer-close {
+      position: absolute;
+      top: 15px;
+      right: 35px;
+      color: #f1f1f1;
+      font-size: 40px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    
+    .media-viewer-close:hover {
+      color: #bbb;
     }
   </style>
   
@@ -641,9 +737,72 @@
         } else {
           messagesHTML = data.messages.map(msg => {
             const time = new Date(msg.timestamp * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            
+            let messageContent = '';
+            
+            // Handle different message types
+            if (msg.hasMedia) {
+              if (msg.type === 'image') {
+                messageContent = `
+                  <div class="media-message">
+                    <img src="data:image/jpeg;base64,${msg.mediaData || ''}" alt="Image" class="message-image" onclick="openMediaViewer(this.src, '${msg.body || 'Image'}')">
+                    ${msg.body ? `<div class="media-caption text-white">${msg.body}</div>` : ''}
+                  </div>
+                `;
+              } else if (msg.type === 'document') {
+                messageContent = `
+                  <div class="media-message">
+                    <div class="document-preview" onclick="downloadDocument('${msg.mediaData || ''}', '${msg.body || 'Document'}')">
+                      <i class="bi bi-file-earmark-text fs-1 text-primary"></i>
+                      <div class="document-info">
+                        <strong>Document</strong>
+                        <small class="text-muted">Click to download</small>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              } else if (msg.type === 'video') {
+                messageContent = `
+                  <div class="media-message">
+                    <video controls class="message-video" onclick="openMediaViewer(this.src, '${msg.body || 'Video'}')">
+                      <source src="data:video/mp4;base64,${msg.mediaData || ''}" type="video/mp4">
+                      Your browser does not support the video tag.
+                    </video>
+                    ${msg.body ? `<div class="media-caption">${msg.body}</div>` : ''}
+                  </div>
+                `;
+              } else if (msg.type === 'audio') {
+                messageContent = `
+                  <div class="media-message">
+                    <audio controls class="message-audio">
+                      <source src="data:audio/mp3;base64,${msg.mediaData || ''}" type="audio/mpeg">
+                      Your browser does not support the audio tag.
+                    </audio>
+                    ${msg.body ? `<div class="media-caption">${msg.body}</div>` : ''}
+                  </div>
+                `;
+              } else {
+                // Generic media message
+                messageContent = `
+                  <div class="media-message">
+                    <div class="generic-media" onclick="downloadMedia('${msg.mediaData || ''}', '${msg.body || 'Media'}')">
+                      <i class="bi bi-file-earmark fs-1 text-primary"></i>
+                      <div class="media-info">
+                        <strong>Media File</strong>
+                        <small class="text-muted">Click to download</small>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }
+            } else {
+              // Text message
+              messageContent = `<div class="message-content">${msg.body}</div>`;
+            }
+            
             return `
               <div class="message-bubble ${msg.fromMe ? 'me' : 'them'}">
-                <div class="message-content">${msg.body}</div>
+                ${messageContent}
                 <div class="message-time">${time}</div>
               </div>
             `;
@@ -985,12 +1144,76 @@
             
             newMessages.forEach(msg => {
               const time = new Date(msg.timestamp * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+              
+              let messageContent = '';
+              
+              // Handle different message types
+              if (msg.hasMedia) {
+                if (msg.type === 'image') {
+                  messageContent = `
+                    <div class="media-message">
+                      <img src="data:image/jpeg;base64,${msg.mediaData || ''}" alt="Image" class="message-image" onclick="openMediaViewer(this.src, '${msg.body || 'Image'}')">
+                      ${msg.body ? `<div class="media-caption">${msg.body}</div>` : ''}
+                    </div>
+                  `;
+                } else if (msg.type === 'document') {
+                  messageContent = `
+                    <div class="media-message">
+                      <div class="document-preview" onclick="downloadDocument('${msg.mediaData || ''}', '${msg.body || 'Document'}')">
+                        <i class="bi bi-file-earmark-text fs-1 text-primary"></i>
+                        <div class="document-info">
+                          <strong>Document</strong>
+                          <small class="text-muted">Click to download</small>
+                        </div>
+                      </div>
+                    </div>
+                  `;
+                } else if (msg.type === 'video') {
+                  messageContent = `
+                    <div class="media-message">
+                      <video controls class="message-video" onclick="openMediaViewer(this.src, '${msg.body || 'Video'}')">
+                        <source src="data:video/mp4;base64,${msg.base64 || ''}" type="video/mp4">
+                        Your browser does not support the video tag.
+                      </video>
+                      ${msg.body ? `<div class="media-caption">${msg.body}</div>` : ''}
+                    </div>
+                  `;
+                } else if (msg.type === 'audio') {
+                  messageContent = `
+                    <div class="media-message">
+                      <audio controls class="message-audio">
+                        <source src="data:audio/mp3;base64,${msg.base64 || ''}" type="audio/mpeg">
+                        Your browser does not support the audio tag.
+                      </audio>
+                      ${msg.body ? `<div class="media-caption">${msg.body}</div>` : ''}
+                    </div>
+                  `;
+                } else {
+                  // Generic media message
+                  messageContent = `
+                    <div class="media-message">
+                      <div class="generic-media" onclick="downloadMedia('${msg.base64 || ''}', '${msg.body || 'Media'}')">
+                        <i class="bi bi-file-earmark fs-1 text-primary"></i>
+                        <div class="media-info">
+                          <strong>Media File</strong>
+                          <small class="text-muted">Click to download</small>
+                        </div>
+                      </div>
+                    </div>
+                  `;
+                }
+              } else {
+                // Text message
+                messageContent = `<div class="message-content">${msg.body}</div>`;
+              }
+              
               const messageHTML = `
                 <div class="message-bubble ${msg.fromMe ? 'me' : 'them'}">
-                  <div class="message-content">${msg.body}</div>
+                  ${messageContent}
                   <div class="message-time">${time}</div>
                 </div>
               `;
+              
               messagesContainer.insertAdjacentHTML('beforeend', messageHTML);
             });
             
@@ -1511,5 +1734,86 @@
         };
         reader.onerror = error => reject(error);
       });
+    }
+    
+    // Media viewer functions
+    function openMediaViewer(src, caption) {
+      const modal = document.getElementById('mediaViewerModal');
+      const content = document.getElementById('mediaViewerContent');
+      
+      if (content.tagName === 'IMG') {
+        content.src = src;
+        content.alt = caption;
+      }
+      
+      modal.style.display = 'block';
+    }
+    
+    function closeMediaViewer() {
+      const modal = document.getElementById('mediaViewerModal');
+      modal.style.display = 'none';
+    }
+    
+    // Download functions
+    function downloadDocument(base64Data, fileName) {
+      if (!base64Data) {
+        showToast('Data file tidak tersedia', 'error');
+        return;
+      }
+      
+      try {
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray]);
+        
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = fileName || 'document';
+        link.click();
+        
+        showToast('Dokumen berhasil diunduh!', 'success');
+      } catch (error) {
+        console.error('Error downloading document:', error);
+        showToast('Gagal mengunduh dokumen', 'error');
+      }
+    }
+    
+    function downloadMedia(base64Data, fileName) {
+      if (!base64Data) {
+        showToast('Data media tidak tersedia', 'error');
+        return;
+      }
+      
+      try {
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray]);
+        
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = fileName || 'media';
+        link.click();
+        
+        showToast('Media berhasil diunduh!', 'success');
+      } catch (error) {
+        console.error('Error downloading media:', error);
+        showToast('Gagal mengunduh media', 'error');
+      }
+    }
+    
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+      const modal = document.getElementById('mediaViewerModal');
+      if (event.target === modal) {
+        closeMediaViewer();
+      }
     }
   </script>

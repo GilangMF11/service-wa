@@ -7,11 +7,11 @@ DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=whatsapp_api
 DB_USER=postgres
-DB_PASSWORD=your_password_here
+DB_PASSWORD=123456
 
 # JWT Configuration
-JWT_SECRET=your-super-secret-jwt-key-here-make-it-very-long-and-random
-JWT_EXPIRES_IN=7d
+JWT_SECRET=vR92dSY1k8JrIYMTNJTl0cSgUdXeK8B/RDghllbiax3DKMTtMM2fQH2khmiv5PRL
+JWT_EXPIRES_IN=30d
 
 # WhatsApp Configuration
 WHATSAPP_SESSION_TIMEOUT=300000

@@ -465,41 +465,15 @@
                 </div>
             </div>
 
-            <!-- Chat APIs -->
+            <!-- WhatsApp Chat APIs -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0"><i class="bi bi-chat-dots me-2"></i>Chat APIs</h5>
+                    <h5 class="mb-0"><i class="bi bi-chat-dots me-2"></i>WhatsApp Chat APIs</h5>
                 </div>
                 <div class="card-body">
                     <div class="api-endpoint mb-4">
-                        <h6 class="text-primary">POST /api/whatsapp/:sessionId/chat/send</h6>
-                        <p class="text-muted">Send direct message</p>
-                        
-                        <div class="row">
-                            <div class="col-md-6">
-                                <h6>Request Body:</h6>
-                                <pre class="bg-light p-3 rounded"><code>{
-  "number": "628123456789",
-  "message": "Hello! How are you?"
-}</code></pre>
-                            </div>
-                            <div class="col-md-6">
-                                <h6>Response:</h6>
-                                <pre class="bg-light p-3 rounded"><code>{
-  "success": true,
-  "message": "Message sent successfully",
-  "data": {
-    "messageId": "3EB0C767D742B9EE0B25",
-    "timestamp": "2024-01-15T10:30:00Z"
-  }
-}</code></pre>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="api-endpoint mb-4">
-                        <h6 class="text-primary">GET /api/whatsapp/:sessionId/chat/history/:number</h6>
-                        <p class="text-muted">Get chat history with a number</p>
+                        <h6 class="text-primary">GET /api/whatsapp/:sessionId/chats</h6>
+                        <p class="text-muted">Get all chats from WhatsApp session</p>
                         
                         <div class="row">
                             <div class="col-md-6">
@@ -510,16 +484,191 @@
                                 <h6>Response:</h6>
                                 <pre class="bg-light p-3 rounded"><code>{
   "success": true,
-  "data": {
-    "messages": [
-      {
-        "id": 1,
-        "message": "Hello!",
-        "type": "sent",
-        "timestamp": "2024-01-15T10:30:00Z"
-      }
-    ]
+  "chats": [
+    {
+      "id": "628123456789@c.us",
+      "name": "John Doe",
+      "isGroup": false,
+      "timestamp": 1642233600,
+      "unreadCount": 2
+    }
+  ]
+}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="api-endpoint mb-4">
+                        <h6 class="text-primary">GET /api/whatsapp/:sessionId/chats/:contactId</h6>
+                        <p class="text-muted">Get chat messages with a specific contact</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Headers:</h6>
+                                <pre class="bg-light p-3 rounded"><code>Authorization: Bearer &lt;token&gt;</code></pre>
+                                <h6>Query Parameters:</h6>
+                                <pre class="bg-light p-3 rounded"><code>limit: 50 (optional, default: 50)</code></pre>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Response:</h6>
+                                <pre class="bg-light p-3 rounded"><code>{
+  "success": true,
+  "contact": {
+    "id": "628123456789@c.us",
+    "name": "John Doe",
+    "isGroup": false
+  },
+  "messages": [
+    {
+      "id": "3EB0C767D742B9EE0B25",
+      "body": "Hello!",
+      "fromMe": true,
+      "author": null,
+      "timestamp": 1642233600,
+      "hasMedia": false,
+      "type": "chat",
+      "mediaData": null
+    }
+  ]
+}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="api-endpoint mb-4">
+                        <h6 class="text-primary">POST /api/whatsapp/:sessionId/chats/:contactId</h6>
+                        <p class="text-muted">Send text message to a contact</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Request Body:</h6>
+                                <pre class="bg-light p-3 rounded"><code>{
+  "message": "Hello! How are you?"
+}</code></pre>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Response:</h6>
+                                <pre class="bg-light p-3 rounded"><code>{
+  "success": true,
+  "message": "Pesan berhasil dikirim",
+  "messageId": "3EB0C767D742B9EE0B25",
+  "timestamp": 1642233600
+}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="api-endpoint mb-4">
+                        <h6 class="text-primary">POST /api/whatsapp/:sessionId/chats/:contactId/file</h6>
+                        <p class="text-muted">Send file (image/document) to a contact</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Request Body:</h6>
+                                <pre class="bg-light p-3 rounded"><code>{
+  "message": "Check this file",
+  "fileType": "image/jpeg",
+  "fileName": "photo.jpg",
+  "fileData": "base64_encoded_file_data"
+}</code></pre>
+                                <h6>Supported File Types:</h6>
+                                <ul class="small text-muted">
+                                    <li>Images: JPEG, JPG, PNG, GIF, WebP</li>
+                                    <li>Documents: PDF, DOC, DOCX, XLS, XLSX</li>
+                                    <li>Text: TXT</li>
+                                    <li>Max Size: 10MB</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Response:</h6>
+                                <pre class="bg-light p-3 rounded"><code>{
+  "success": true,
+  "message": "File berhasil dikirim",
+  "messageId": "file-sent-success",
+  "timestamp": 1642233600,
+  "fileType": "image/jpeg",
+  "fileName": "photo.jpg"
+}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- WhatsApp Session Management APIs -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="bi bi-phone me-2"></i>WhatsApp Session Management APIs</h5>
+                </div>
+                <div class="card-body">
+                    <div class="api-endpoint mb-4">
+                        <h6 class="text-warning">GET /api/whatsapp/sessions</h6>
+                        <p class="text-muted">Get all WhatsApp sessions for current user</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Headers:</h6>
+                                <pre class="bg-light p-3 rounded"><code>Authorization: Bearer &lt;token&gt;</code></pre>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Response:</h6>
+                                <pre class="bg-light p-3 rounded"><code>{
+  "success": true,
+  "sessions": [
+    {
+      "session_id": "d0cc358f-20c0-4307-a15d-d40566105071",
+      "name": "WhatsApp Session 1",
+      "status": "ready",
+      "created_at": "2024-01-15T09:00:00Z",
+      "last_activity": "2024-01-15T10:30:00Z"
+    }
+  ]
+}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="api-endpoint mb-4">
+                        <h6 class="text-warning">POST /api/whatsapp/sessions</h6>
+                        <p class="text-muted">Create new WhatsApp session</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Request Body:</h6>
+                                <pre class="bg-light p-3 rounded"><code>{
+  "name": "My WhatsApp Session"
+}</code></pre>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Response:</h6>
+                                <pre class="bg-light p-3 rounded"><code>{
+  "success": true,
+  "message": "Session created successfully",
+  "session": {
+    "session_id": "d0cc358f-20c0-4307-a15d-d40566105071",
+    "name": "My WhatsApp Session",
+    "qr_code": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...",
+    "status": "qr_ready"
   }
+}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="api-endpoint mb-4">
+                        <h6 class="text-warning">DELETE /api/whatsapp/sessions/:sessionId</h6>
+                        <p class="text-muted">Delete WhatsApp session</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Headers:</h6>
+                                <pre class="bg-light p-3 rounded"><code>Authorization: Bearer &lt;token&gt;</code></pre>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Response:</h6>
+                                <pre class="bg-light p-3 rounded"><code>{
+  "success": true,
+  "message": "Session deleted successfully"
 }</code></pre>
                             </div>
                         </div>
@@ -581,6 +730,93 @@ format: "number,name"</code></pre>
     "imported": 50,
     "duplicates": 5
   }
+}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Broadcast APIs -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="bi bi-megaphone me-2"></i>Broadcast APIs</h5>
+                </div>
+                <div class="card-body">
+                    <div class="api-endpoint mb-4">
+                        <h6 class="text-danger">GET /api/broadcast/lists</h6>
+                        <p class="text-muted">Get all broadcast lists for current user</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Headers:</h6>
+                                <pre class="bg-light p-3 rounded"><code>Authorization: Bearer &lt;token&gt;</code></pre>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Response:</h6>
+                                <pre class="bg-light p-3 rounded"><code>{
+  "success": true,
+  "lists": [
+    {
+      "id": 1,
+      "name": "Customer List",
+      "contact_count": 150,
+      "created_at": "2024-01-15T09:00:00Z"
+    }
+  ]
+}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="api-endpoint mb-4">
+                        <h6 class="text-danger">POST /api/broadcast/lists</h6>
+                        <p class="text-muted">Create new broadcast list</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Request Body:</h6>
+                                <pre class="bg-light p-3 rounded"><code>{
+  "name": "New Customer List",
+  "contacts": [
+    {
+      "number": "628123456789",
+      "name": "John Doe"
+    }
+  ]
+}</code></pre>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Response:</h6>
+                                <pre class="bg-light p-3 rounded"><code>{
+  "success": true,
+  "message": "Broadcast list created successfully",
+  "list_id": 1
+}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="api-endpoint mb-4">
+                        <h6 class="text-danger">POST /api/broadcast/send</h6>
+                        <p class="text-muted">Send broadcast message to list</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Request Body:</h6>
+                                <pre class="bg-light p-3 rounded"><code>{
+  "list_id": 1,
+  "session_id": "d0cc358f-20c0-4307-a15d-d40566105071",
+  "message": "Hello everyone! This is a broadcast message."
+}</code></pre>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Response:</h6>
+                                <pre class="bg-light p-3 rounded"><code>{
+  "success": true,
+  "message": "Broadcast sent successfully",
+  "sent_count": 150,
+  "failed_count": 0
 }</code></pre>
                             </div>
                         </div>
@@ -709,6 +945,45 @@ format: "number,name"</code></pre>
                 </div>
             </div>
 
+            <!-- WhatsApp Error Handling -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i>WhatsApp Error Handling</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <h6><i class="bi bi-info-circle me-2"></i>Serialize Error Handling</h6>
+                        <p class="mb-0">WhatsApp Web.js sometimes encounters serialize errors. Our API automatically handles these with:</p>
+                        <ul class="mb-0 mt-2">
+                            <li><strong>Timeout Protection:</strong> 30-second timeout for all operations</li>
+                            <li><strong>Manual Verification:</strong> Check recent messages to verify delivery</li>
+                            <li><strong>Fallback Response:</strong> Assume success for known serialize issues</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Serialize Error Response:</h6>
+                            <pre class="bg-light p-3 rounded"><code>{
+  "success": true,
+  "message": "Pesan berhasil dikirim (verifikasi manual)",
+  "messageId": "manual-verification",
+  "timestamp": 1642233600,
+  "note": "Message verified as sent despite serialize error"
+}</code></pre>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Client Not Ready Error:</h6>
+                            <pre class="bg-light p-3 rounded"><code>{
+  "success": false,
+  "message": "WhatsApp client belum siap. Silakan scan QR code terlebih dahulu.",
+  "needScan": true
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Error Responses -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-danger text-white">
@@ -762,9 +1037,23 @@ format: "number,name"</code></pre>
                     <div class="alert alert-info">
                         <h6><i class="bi bi-info-circle me-2"></i>Rate Limits</h6>
                         <ul class="mb-0">
-                            <li><strong>General APIs:</strong> 100 requests per minute per user</li>
-                            <li><strong>Broadcast APIs:</strong> 10 requests per minute per user</li>
-                            <li><strong>WhatsApp APIs:</strong> 50 requests per minute per user</li>
+                            <li><strong>Authentication APIs:</strong> 10 requests per minute per IP</li>
+                            <li><strong>WhatsApp Session APIs:</strong> 30 requests per minute per user</li>
+                            <li><strong>WhatsApp Chat APIs:</strong> 100 requests per minute per user</li>
+                            <li><strong>WhatsApp Contact APIs:</strong> 50 requests per minute per user</li>
+                            <li><strong>Broadcast APIs:</strong> 20 requests per minute per user</li>
+                            <li><strong>User Management APIs:</strong> 20 requests per minute per user</li>
+                            <li><strong>Dashboard APIs:</strong> 30 requests per minute per user</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <h6><i class="bi bi-exclamation-triangle me-2"></i>WhatsApp Web.js Limitations</h6>
+                        <ul class="mb-0">
+                            <li><strong>Message Sending:</strong> Max 1 message per second per session</li>
+                            <li><strong>File Upload:</strong> Max 10MB per file</li>
+                            <li><strong>Media Download:</strong> Automatic retry on failure</li>
+                            <li><strong>Session Management:</strong> Max 5 concurrent sessions per user</li>
                         </ul>
                     </div>
                     
