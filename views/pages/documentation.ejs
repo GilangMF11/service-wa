@@ -629,6 +629,41 @@
                     </div>
 
                     <div class="api-endpoint mb-4">
+                        <h6 class="text-warning">GET /api/whatsapp/session/:sessionId</h6>
+                        <p class="text-muted">Get detailed information about a specific session</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Headers:</h6>
+                                <pre class="bg-light p-3 rounded"><code>Authorization: Bearer &lt;token&gt;</code></pre>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Response:</h6>
+                                <pre class="bg-light p-3 rounded"><code>{
+  "success": true,
+  "session": {
+    "session_id": "d0cc358f-20c0-4307-a15d-d40566105071",
+    "name": "WhatsApp Session 1",
+    "status": "ready",
+    "created_at": "2024-01-15T09:00:00Z",
+    "last_activity": "2024-01-15T10:30:00Z",
+    "client_status": {
+      "exists": true,
+      "isReady": true,
+      "hasPage": true,
+      "connectionState": "connected"
+    },
+    "statistics": {
+      "message_count": 5,
+      "contact_count": 150
+    }
+  }
+}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="api-endpoint mb-4">
                         <h6 class="text-warning">POST /api/whatsapp/sessions</h6>
                         <p class="text-muted">Create new WhatsApp session</p>
                         

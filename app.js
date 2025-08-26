@@ -1196,7 +1196,124 @@ app.get('/api/whatsapp/sessions', async (req, res) => {
 });
 
 
-// Endpoint untuk mendapatkan QR code
+// Endpoint untuk mendapatkan QR code (dipindah ke bawah setelah session detail)
+// app.get('/api/whatsapp/session/:sessionId/qrcode', async (req, res) => {
+//     try {
+//         const { sessionId } = req.params;
+//         const userId = req.user.id;  // Dari token JWT
+        
+//         // Verifikasi bahwa session milik user ini
+//         const session = await whatsappSessionQueries.getSessionBySessionId(sessionId);
+//         if (!session || session.user_id !== userId) {
+//             return res.status(403).json({ 
+//                 success: false, 
+//                 message: 'Tidak memiliki akses ke session ini'
+//             });
+//         }
+        
+//         // Reset session untuk mendapatkan QR code baru
+//         await deleteSessionAndReInitialize(sessionId);
+        
+//         // Tunggu sebentar sampai QR code tersedia
+//         setTimeout(() => {
+//             const qrCode = clients[sessionId] ? clients[sessionId].qrCode : null;
+            
+//             if (qrCode) {
+//                 res.status(200).json({ 
+//                     success: true, 
+//                     message: 'QR Code siap untuk di-scan',
+//                     qrCode: qrCode
+//                 });
+//             } else {
+//                 res.status(404).json({ 
+//                     success: false, 
+//                     message: 'QR Code belum tersedia, coba lagi nanti'
+//                 });
+//             }
+//         }, 2000);
+//     } catch (error) {
+//         console.error('Error saat mendapatkan QR code:', error);
+//         res.status(500).json({ 
+//             success: false, 
+//             message: 'Gagal mendapatkan QR code', 
+//             error: error.message 
+//         });
+//     }
+// });
+
+// Endpoint untuk mendapatkan detail session
+app.get('/api/whatsapp/session/:sessionId', async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const userId = req.user.id;
+        
+        console.log('🚀 GET /api/whatsapp/session/:sessionId called');
+        console.log('🔗 Session ID:', sessionId);
+        console.log('👤 User ID:', userId);
+        
+        // Cek apakah session ada dan milik user
+        const sessionRecord = await whatsappSessionQueries.getSessionBySessionId(sessionId);
+        if (!sessionRecord || sessionRecord.user_id !== userId) {
+            return res.status(404).json({
+                success: false,
+                message: 'Session tidak ditemukan atau tidak memiliki akses'
+            });
+        }
+        
+        // Cek apakah client ada dan siap
+        const clientStatus = clients[sessionId] ? {
+            exists: true,
+            isReady: clients[sessionId].isReady,
+            hasPage: !!clients[sessionId].client?.pupPage,
+            connectionState: clients[sessionId].client ? 'connected' : 'disconnected'
+        } : {
+            exists: false,
+            isReady: false,
+            hasPage: false,
+            connectionState: 'not_initialized'
+        };
+        
+        // Get session statistics
+        let messageCount = 0;
+        let contactCount = 0;
+        
+        if (clients[sessionId] && clients[sessionId].isReady) {
+            try {
+                const chats = await clients[sessionId].client.getChats();
+                messageCount = chats.reduce((total, chat) => total + chat.unreadCount, 0);
+                contactCount = chats.length;
+            } catch (error) {
+                console.warn('⚠️ Could not get session statistics:', error.message);
+            }
+        }
+        
+        res.status(200).json({
+            success: true,
+            session: {
+                session_id: sessionRecord.session_id,
+                name: sessionRecord.name,
+                status: sessionRecord.status,
+                created_at: sessionRecord.created_at,
+                last_activity: sessionRecord.updated_at,
+                client_status: clientStatus,
+                statistics: {
+                    message_count: messageCount,
+                    contact_count: contactCount
+                }
+            }
+        });
+        
+    } catch (error) {
+        console.error('Error saat mengambil detail session:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Gagal mengambil detail session',
+            error: error.message
+        });
+    }
+});
+
+// Endpoint untuk mendapatkan QR code (setelah session detail)
 app.get('/api/whatsapp/session/:sessionId/qrcode', verifyToken, async (req, res) => {
     try {
         const { sessionId } = req.params;
@@ -1262,49 +1379,6 @@ app.get('/api/whatsapp/session/:sessionId/qrcode', verifyToken, async (req, res)
         });
     }
 });
-// app.get('/api/whatsapp/session/:sessionId/qrcode', async (req, res) => {
-//     try {
-//         const { sessionId } = req.params;
-//         const userId = req.user.id;  // Dari token JWT
-        
-//         // Verifikasi bahwa session milik user ini
-//         const session = await whatsappSessionQueries.getSessionBySessionId(sessionId);
-//         if (!session || session.user_id !== userId) {
-//             return res.status(403).json({ 
-//                 success: false, 
-//                 message: 'Tidak memiliki akses ke session ini'
-//             });
-//         }
-        
-//         // Reset session untuk mendapatkan QR code baru
-//         await deleteSessionAndReInitialize(sessionId);
-        
-//         // Tunggu sebentar sampai QR code tersedia
-//         setTimeout(() => {
-//             const qrCode = clients[sessionId] ? clients[sessionId].qrCode : null;
-            
-//             if (qrCode) {
-//                 res.status(200).json({ 
-//                     success: true, 
-//                     message: 'QR Code siap untuk di-scan',
-//                     qrCode: qrCode
-//                 });
-//             } else {
-//                 res.status(404).json({ 
-//                     success: false, 
-//                     message: 'QR Code belum tersedia, coba lagi nanti'
-//                 });
-//             }
-//         }, 2000);
-//     } catch (error) {
-//         console.error('Error saat mendapatkan QR code:', error);
-//         res.status(500).json({ 
-//             success: false, 
-//             message: 'Gagal mendapatkan QR code', 
-//             error: error.message 
-//         });
-//     }
-// });
 
 // Endpoint untuk memeriksa status koneksi
 app.get('/api/whatsapp/session/:sessionId/status', async (req, res) => {
