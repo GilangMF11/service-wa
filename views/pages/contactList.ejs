@@ -159,11 +159,76 @@
   </style>
   
   <script>
+    // Get token from global scope (defined in main.ejs)
     const token = localStorage.getItem('token');
     const sessionId = new URLSearchParams(window.location.search).get('id');
     let allContacts = [];
+    
+    // Debug: Log when script starts loading
+    console.log('🚀 contactList.ejs script loading...');
+    console.log('🔍 Window object at script start:', Object.keys(window));
+    console.log('🔍 apiCall available at script start:', typeof window.apiCall);
+    
+    // Check prerequisites
+    if (!token) {
+      console.error('❌ No token available');
+      alert('Kamu harus login dulu!');
+      window.location.href = '/auth/login';
+    }
+    
+    // Fallback apiCall function if global one is not available
+    if (typeof window.apiCall !== 'function') {
+      console.warn('⚠️ Global apiCall function not available, creating fallback');
+      window.apiCall = async (url, options = {}) => {
+        const token = localStorage.getItem('token');
+        const headers = {
+          'Content-Type': 'application/json',
+          ...options.headers
+        };
+        
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        // Use dynamic base URL if available, otherwise fallback to relative URL
+        let fullUrl;
+        if (window.AppConfig && window.AppConfig.apiBaseUrl) {
+          // If URL already starts with /api, remove it to avoid duplication
+          if (url.startsWith('/api/')) {
+            fullUrl = `${window.AppConfig.apiBaseUrl}${url.substring(4)}`;
+          } else if (url.startsWith('/')) {
+            fullUrl = `${window.AppConfig.apiBaseUrl}${url}`;
+          } else {
+            fullUrl = `${window.AppConfig.apiBaseUrl}/${url}`;
+          }
+        } else {
+          fullUrl = url;
+        }
+        
+        console.log('🔗 Fallback - Original URL:', url);
+        console.log('🔗 Fallback - Full URL:', fullUrl);
+
+        const response = await fetch(fullUrl, {
+          ...options,
+          headers
+        });
+
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          window.location.href = '/auth/login';
+          return;
+        }
+
+        return response;
+      };
+      console.log('✅ Fallback apiCall function created');
+    }
   
     async function loadContacts() {
+      console.log('🚀 Loading contacts for session:', sessionId);
+      console.log('🔑 Token available:', !!token);
+      console.log('🌐 apiCall available:', typeof window.apiCall);
+      
       const container = document.getElementById('contact-list');
       const countDisplay = document.getElementById('contact-count');
       
@@ -172,22 +237,50 @@
           <div class="spinner-border text-primary" role="status">
             <span class="visually-hidden">Memuat kontak...</span>
           </div>
-          <p class="mt-2 text-muted">Memuat kontak...</p>
+          <p class="mt-2 text-muted">Memuat kontak dari WhatsApp...</p>
+          <small class="text-muted">Session: ${sessionId}</small>
         </div>
       `;
       countDisplay.innerText = 'Memuat kontak...';
   
-      try {
+            try {
+        console.log('📡 Calling API:', `/api/whatsapp/${sessionId}/contacts`);
         const response = await apiCall(`/api/whatsapp/${sessionId}/contacts`);
-  
+        
+        console.log('📡 Response status:', response.status);
+        console.log('📡 Response ok:', response.ok);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ HTTP Error:', response.status, response.statusText);
+          console.error('❌ Error response:', errorText);
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
         const data = await response.json();
+        console.log('📨 API response data:', data);
   
         if (!data.success) {
+          let errorMessage = data.message || 'Gagal memuat kontak';
+          let alertType = 'danger';
+          let icon = 'bi-exclamation-circle-fill';
+          
+          // Handle specific error cases
+          if (data.message && data.message.includes('belum siap')) {
+            errorMessage = 'WhatsApp client belum siap. Silakan scan QR code terlebih dahulu.';
+            alertType = 'warning';
+            icon = 'bi-exclamation-triangle-fill';
+          } else if (data.message && data.message.includes('tidak ditemukan')) {
+            errorMessage = 'Session tidak ditemukan atau tidak memiliki akses.';
+            alertType = 'danger';
+            icon = 'bi-x-circle-fill';
+          }
+          
           container.innerHTML = `
             <div class="col-12">
-              <div class="alert alert-danger text-center p-4">
-                <i class="bi bi-exclamation-circle-fill me-2"></i>
-                Gagal memuat kontak
+              <div class="alert alert-${alertType} text-center p-4">
+                <i class="bi ${icon} me-2"></i>
+                ${errorMessage}
               </div>
             </div>
           `;

@@ -820,6 +820,68 @@ app.post('/api/whatsapp/:sessionId/chats/:contactId', async (req, res) => {
 
 
 
+// Endpoint untuk mendapatkan daftar contacts dalam session
+app.get('/api/whatsapp/:sessionId/contacts', async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const userId = req.user.id;
+        
+        console.log('🚀 GET /api/whatsapp/:sessionId/contacts called');
+        console.log('🔗 Session ID:', sessionId);
+        console.log('👤 User ID:', userId);
+        
+        // Cek apakah session ada dan milik user
+        const sessionRecord = await whatsappSessionQueries.getSessionBySessionId(sessionId);
+        if (!sessionRecord || sessionRecord.user_id !== userId) {
+            return res.status(404).json({
+                success: false,
+                message: 'Session tidak ditemukan atau tidak memiliki akses'
+            });
+        }
+        
+        // Cek apakah client ada dan siap
+        if (!clients[sessionId] || !clients[sessionId].isReady) {
+            return res.status(503).json({
+                success: false,
+                message: 'WhatsApp client belum siap. Silakan scan QR code terlebih dahulu.',
+                needScan: true
+            });
+        }
+        
+        // Ambil semua contacts
+        const contacts = await clients[sessionId].client.getContacts();
+        
+        // Filter dan format contacts
+        const formattedContacts = contacts
+            .filter(contact => contact.id.server === 'c.us') // Hanya personal contacts, bukan groups
+            .map(contact => ({
+                id: contact.id._serialized,
+                name: contact.name || contact.pushname || 'Tanpa Nama',
+                number: contact.number,
+                isGroup: contact.isGroup || false,
+                isWAContact: contact.isWAContact || false,
+                isMyContact: contact.isMyContact || false
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name)); // Sort by name
+        
+        console.log(`📱 Found ${formattedContacts.length} contacts`);
+        
+        res.status(200).json({
+            success: true,
+            contacts: formattedContacts,
+            total: formattedContacts.length
+        });
+        
+    } catch (error) {
+        console.error('Error saat mengambil daftar contacts:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Gagal mengambil daftar contacts',
+            error: error.message
+        });
+    }
+});
+
 // Endpoint untuk mendapatkan daftar session user
 app.get('/api/whatsapp/sessions', async (req, res) => {
     try {
