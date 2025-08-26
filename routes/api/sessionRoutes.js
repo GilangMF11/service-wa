@@ -1,5 +1,8 @@
 const express = require('express');
 const router = express.Router();
+const { verifyToken } = require('../../middleware/authMiddleware');
+const { whatsappSessionQueries } = require('../../db');
+const clients = require('../../clients');
 
 // Get all sessions
 router.get('/', async (req, res) => {
@@ -74,6 +77,49 @@ router.get('/:sessionId', async (req, res) => {
         res.status(500).json({ 
             success: false, 
             message: 'Failed to get session' 
+        });
+    }
+});
+
+// WhatsApp sessions endpoint
+router.get('/whatsapp', verifyToken, async (req, res) => {
+    try {
+        console.log('🚀 GET /api/sessions/whatsapp called');
+        console.log('👤 User ID:', req.user.id);
+        console.log('🔑 User object:', req.user);
+        
+        const userId = req.user.id;
+        
+        // Dapatkan semua session user dari database
+        const sessions = await whatsappSessionQueries.getSessionsByUserId(userId);
+        console.log('📱 Database sessions:', sessions);
+        
+        // Tambahkan status koneksi dari client yang sedang aktif
+        const enhancedSessions = sessions.map(session => {
+            const client = clients[session.session_id];
+            const enhanced = {
+                ...session,
+                isConnected: client ? client.isReady : false,
+                hasQrCode: client ? client.qrCode !== null : false,
+                lastSeen: client ? client.createdAt : session.updated_at
+            };
+            console.log(`📱 Session ${session.session_id}:`, enhanced);
+            return enhanced;
+        });
+        
+        console.log('✅ Enhanced sessions:', enhancedSessions);
+        
+        res.status(200).json({ 
+            success: true, 
+            sessions: enhancedSessions
+        });
+    } catch (error) {
+        console.error('❌ Error saat mendapatkan daftar session:', error);
+        console.error('❌ Error stack:', error.stack);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Gagal mendapatkan daftar session', 
+            error: error.message 
         });
     }
 });

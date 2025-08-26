@@ -495,9 +495,22 @@
         }
 
         // Use dynamic base URL if available, otherwise fallback to relative URL
-        const fullUrl = window.AppConfig && window.AppConfig.apiBaseUrl 
-            ? `${window.AppConfig.apiBaseUrl}${url.startsWith('/') ? url : `/${url}`}`
-            : url;
+        let fullUrl;
+        if (window.AppConfig && window.AppConfig.apiBaseUrl) {
+            // If URL already starts with /api, remove it to avoid duplication
+            if (url.startsWith('/api/')) {
+                fullUrl = `${window.AppConfig.apiBaseUrl}${url.substring(4)}`;
+            } else if (url.startsWith('/')) {
+                fullUrl = `${window.AppConfig.apiBaseUrl}${url}`;
+            } else {
+                fullUrl = `${window.AppConfig.apiBaseUrl}/${url}`;
+            }
+        } else {
+            fullUrl = url;
+        }
+        
+        console.log('🔗 Original URL:', url);
+        console.log('🔗 Full URL:', fullUrl);
 
         const response = await fetch(fullUrl, {
             ...options,

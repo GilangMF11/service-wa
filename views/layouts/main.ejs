@@ -245,6 +245,56 @@
           alert('Kamu harus login dulu!');
           window.location.href = '/auth/login';
         }
+        
+        // Global utility function for API calls
+        window.apiCall = async (url, options = {}) => {
+            // Use the token from global scope, don't redeclare
+            const headers = {
+                'Content-Type': 'application/json',
+                ...options.headers
+            };
+            
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            // Use dynamic base URL if available, otherwise fallback to relative URL
+            let fullUrl;
+            if (window.AppConfig && window.AppConfig.apiBaseUrl) {
+                // If URL already starts with /api, remove it to avoid duplication
+                if (url.startsWith('/api/')) {
+                    fullUrl = `${window.AppConfig.apiBaseUrl}${url.substring(4)}`;
+                } else if (url.startsWith('/')) {
+                    fullUrl = `${window.AppConfig.apiBaseUrl}${url}`;
+                } else {
+                    fullUrl = `${window.AppConfig.apiBaseUrl}/${url}`;
+                }
+            } else {
+                fullUrl = url;
+            }
+            
+            console.log('🔗 Original URL:', url);
+            console.log('🔗 Full URL:', fullUrl);
+
+            const response = await fetch(fullUrl, {
+                ...options,
+                headers
+            });
+
+            if (response.status === 401) {
+                localStorage.removeItem('token');
+                window.location.href = '/auth/login';
+                return;
+            }
+
+            return response;
+        };
+        
+        console.log('🌐 Global apiCall function loaded');
+        console.log('🔍 Window object keys:', Object.keys(window));
+        console.log('🔍 apiCall function type:', typeof window.apiCall);
+        console.log('🔍 AppConfig available:', !!window.AppConfig);
+        console.log('🔍 AppConfig keys:', window.AppConfig ? Object.keys(window.AppConfig) : 'N/A');
       </script>
       
 </body>

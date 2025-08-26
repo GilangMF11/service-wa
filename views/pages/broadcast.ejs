@@ -780,9 +780,22 @@
         }
 
         // Use dynamic base URL if available, otherwise fallback to relative URL
-        const fullUrl = window.AppConfig && window.AppConfig.apiBaseUrl 
-            ? `${window.AppConfig.apiBaseUrl}${url.startsWith('/') ? url : `/${url}`}`
-            : url;
+        let fullUrl;
+        if (window.AppConfig && window.AppConfig.apiBaseUrl) {
+            // If URL already starts with /api, remove it to avoid duplication
+            if (url.startsWith('/api/')) {
+                fullUrl = `${window.AppConfig.apiBaseUrl}${url.substring(4)}`;
+            } else if (url.startsWith('/')) {
+                fullUrl = `${window.AppConfig.apiBaseUrl}${url}`;
+            } else {
+                fullUrl = `${window.AppConfig.apiBaseUrl}/${url}`;
+            }
+        } else {
+            fullUrl = url;
+        }
+        
+        console.log('🔗 Original URL:', url);
+        console.log('🔗 Full URL:', fullUrl);
 
         const response = await fetch(fullUrl, {
             ...options,
@@ -801,8 +814,28 @@
     // Load WhatsApp sessions
     const loadSessions = async () => {
         try {
+            console.log('🔄 Loading WhatsApp sessions...');
+            
+            // Test endpoint first
+            try {
+                const testResponse = await apiCall('/api/whatsapp/sessions/test');
+                const testData = await testResponse.json();
+                console.log('✅ Test endpoint response:', testData);
+            } catch (testError) {
+                console.error('❌ Test endpoint failed:', testError);
+            }
+            
+            // Now try the real endpoint
             const response = await apiCall('/api/whatsapp/sessions');
+            console.log('📡 Response status:', response.status);
+            console.log('📡 Response headers:', response.headers);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
             const data = await response.json();
+            console.log('📊 Sessions data:', data);
             
             if (data.success) {
                 const sessionSelect = document.getElementById('sessionSelect');
@@ -815,10 +848,20 @@
                     option.disabled = !session.isConnected;
                     sessionSelect.appendChild(option);
                 });
+                
+                console.log(`✅ Loaded ${data.sessions.length} sessions`);
+            } else {
+                console.error('❌ Failed to load sessions:', data.message);
+                showToast('Failed to load sessions: ' + data.message, 'error');
             }
         } catch (error) {
-            console.error('Error loading sessions:', error);
-            showToast('Failed to load sessions', 'error');
+            console.error('❌ Error loading sessions:', error);
+            console.error('❌ Error details:', {
+                name: error.name,
+                message: error.message,
+                stack: error.stack
+            });
+            showToast('Failed to load sessions: ' + error.message, 'error');
         }
     };
 

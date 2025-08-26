@@ -236,16 +236,93 @@
   
   <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
   <script>
+    // Get token from global scope (defined in main.ejs)
     const token = localStorage.getItem('token');
+    if (!token) {
+        console.error('❌ No token found, redirecting to login');
+        window.location.href = '/auth/login';
+    }
+    
     const urlParams = new URLSearchParams(window.location.search);
     const sessionId = urlParams.get('id');
     
     // Debug: Log session ID
     console.log('🔍 Session ID from URL:', sessionId);
     console.log('🔍 Current URL:', window.location.href);
-  
-    // Initialize WebSocket connection
+    console.log('🔑 Token available:', !!token);
+    
+        // Initialize WebSocket connection
     let socket;
+    
+    // Fallback apiCall function if global one is not available
+    function createFallbackApiCall() {
+        console.log('🔄 Creating fallback apiCall function');
+        return async (url, options = {}) => {
+            // Use the token from global scope, don't redeclare
+            const headers = {
+                'Content-Type': 'application/json',
+                ...options.headers
+            };
+            
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            // Use dynamic base URL if available, otherwise fallback to relative URL
+            let fullUrl;
+            if (window.AppConfig && window.AppConfig.apiBaseUrl) {
+                // If URL already starts with /api, remove it to avoid duplication
+                if (url.startsWith('/api/')) {
+                    fullUrl = `${window.AppConfig.apiBaseUrl}${url.substring(4)}`;
+                } else if (url.startsWith('/')) {
+                    fullUrl = `${window.AppConfig.apiBaseUrl}${url}`;
+                } else {
+                    fullUrl = `${window.AppConfig.apiBaseUrl}/${url}`;
+                }
+            } else {
+                fullUrl = url;
+            }
+            
+            console.log('🔗 Fallback - Original URL:', url);
+            console.log('🔗 Fallback - Full URL:', fullUrl);
+
+            const response = await fetch(fullUrl, {
+                ...options,
+                headers
+            });
+
+            if (response.status === 401) {
+                localStorage.removeItem('token');
+                window.location.href = '/auth/login';
+                return;
+            }
+
+            return response;
+        };
+    }
+    
+    // Function to check prerequisites
+    function checkPrerequisites() {
+        if (!token) {
+            console.error('❌ No token available');
+            return false;
+        }
+        
+        // Check if global apiCall is available, if not create fallback
+        if (typeof window.apiCall !== 'function') {
+            console.warn('⚠️ Global apiCall function not available, creating fallback');
+            window.apiCall = createFallbackApiCall();
+            console.log('✅ Fallback apiCall function created');
+        }
+        
+        if (!sessionId) {
+            console.error('❌ No session ID in URL');
+            return false;
+        }
+        
+        console.log('✅ All prerequisites met');
+        return true;
+    }
     
     function initWebSocket() {
       // Get socket.io from CDN or local
@@ -331,22 +408,36 @@
     let allChats = [];
   
     async function loadChatList() {
-      const container = document.getElementById('chat-list');
-      container.innerHTML = `
-        <div class="d-flex justify-content-center align-items-center p-4">
-          <div class="spinner-border text-primary" role="status" style="width: 1.5rem; height: 1.5rem;">
-            <span class="visually-hidden">Memuat...</span>
-          </div>
-          <span class="ms-2 text-muted">Memuat daftar chat...</span>
-        </div>
-      `;
-  
       try {
-        const res = await fetch(`/api/whatsapp/${sessionId}/chats`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-  
+        // Check prerequisites again
+        if (!checkPrerequisites()) {
+          throw new Error('Prerequisites not met');
+        }
+        
+        const container = document.getElementById('chat-list');
+        if (!container) {
+          throw new Error('Chat list container not found');
+        }
+        
+        container.innerHTML = `
+          <div class="d-flex justify-content-center align-items-center p-4">
+            <div class="spinner-border text-primary" role="status" style="width: 1.5rem; height: 1.5rem;">
+              <span class="visually-hidden">Memuat...</span>
+            </div>
+            <span class="ms-2 text-muted">Memuat daftar chat...</span>
+          </div>
+        `;
+    
+        console.log('🔄 Loading chat list for session:', sessionId);
+        const res = await apiCall(`/api/whatsapp/${sessionId}/chats`);
+        console.log('📡 Response received:', res);
+    
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+    
         const data = await res.json();
+        console.log('📊 Chat data:', data);
         allChats = data.chats || [];
         
         if (!data.success || data.chats.length === 0) {
@@ -358,17 +449,21 @@
           `;
           return;
         }
-  
+    
         renderChatList(data.chats);
-  
+    
       } catch (error) {
-        console.error(error);
-        container.innerHTML = `
-          <div class="alert alert-danger mx-3 my-4">
-            <i class="bi bi-exclamation-triangle-fill me-2"></i>
-            Gagal memuat chat
-          </div>
-        `;
+        console.error('❌ Error loading chat list:', error);
+        const container = document.getElementById('chat-list');
+        if (container) {
+          container.innerHTML = `
+            <div class="alert alert-danger mx-3 my-4">
+              <i class="bi bi-exclamation-triangle-fill me-2"></i>
+              Gagal memuat chat: ${error.message}
+            </div>
+          `;
+        }
+        showToast('Gagal memuat daftar chat: ' + error.message, 'error');
       }
     }
     
@@ -455,9 +550,7 @@
       `;
   
       try {
-        const res = await fetch(`/api/whatsapp/${sessionId}/chats/${contactId}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await apiCall(`/api/whatsapp/${sessionId}/chats/${contactId}`);
         const data = await res.json();
   
         if (!data.success) {
@@ -602,16 +695,31 @@
         sendButton.innerHTML = '<i class="bi bi-hourglass-split"></i>';
         sendButton.disabled = true;
   
-        const res = await fetch(`/api/whatsapp/${sessionId}/chats/${contactId}`, {
+                const res = await apiCall(`/api/whatsapp/${sessionId}/chats/${contactId}`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
           body: JSON.stringify({ message })
         });
-  
+
+        // Check if response is ok
+        if (!res.ok) {
+          console.error('❌ HTTP Error:', res.status, res.statusText);
+          const errorText = await res.text();
+          console.error('❌ Error response:', errorText);
+          
+          // Try to parse as JSON if possible
+          let errorData;
+          try {
+            errorData = JSON.parse(errorText);
+          } catch (e) {
+            errorData = { message: `HTTP ${res.status}: ${res.statusText}` };
+          }
+          
+          throw new Error(errorData.message || `HTTP ${res.status}: ${res.statusText}`);
+        }
+
         const data = await res.json();
+        console.log('📨 Send message response:', data);
+        
         if (data.success) {
           // Clear input
           input.value = '';
@@ -634,11 +742,24 @@
           showToast(data.message || 'Gagal mengirim pesan', 'error');
           playErrorSound();
         }
-      } catch (err) {
-        console.error(err);
-        showToast('Terjadi kesalahan saat mengirim pesan', 'error');
-        playErrorSound();
-      } finally {
+              } catch (err) {
+          console.error('❌ Error in sendMessage:', err);
+          
+          // Show more specific error message
+          let errorMessage = 'Terjadi kesalahan saat mengirim pesan';
+          if (err.message) {
+            if (err.message.includes('serialize')) {
+              errorMessage = 'Pesan terkirim tapi ada masalah teknis (serialize error)';
+            } else if (err.message.includes('timeout')) {
+              errorMessage = 'Pesan timeout, coba kirim lagi';
+            } else if (err.message.includes('500')) {
+              errorMessage = 'Server error, coba refresh halaman';
+            }
+          }
+          
+          showToast(errorMessage, 'error');
+          playErrorSound();
+        } finally {
         // Restore send button
         const sendButton = input.nextElementSibling;
         sendButton.innerHTML = '<i class="bi bi-send-fill"></i>';
@@ -670,9 +791,7 @@
       try {
         console.log('🔄 Refreshing messages for contact:', contactId);
         
-        const res = await fetch(`/api/whatsapp/${sessionId}/chats/${contactId}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await apiCall(`/api/whatsapp/${sessionId}/chats/${contactId}`);
         const data = await res.json();
   
         if (data.success && data.messages.length > 0) {
@@ -970,11 +1089,34 @@
       });
     }
     
+    // Debug: Log when script starts loading
+    console.log('🚀 chatsList.ejs script loading...');
+    console.log('🔍 Window object at script start:', Object.keys(window));
+    console.log('🔍 apiCall available at script start:', typeof window.apiCall);
+    
     document.addEventListener('DOMContentLoaded', () => {
-      loadChatList();
-      setupSearch();
+      console.log('📱 DOM Content Loaded event fired');
+      console.log('🔍 Window object at DOM ready:', Object.keys(window));
+      console.log('🔍 apiCall available at DOM ready:', typeof window.apiCall);
       
-      // Initialize WebSocket connection
-      initWebSocket();
+      try {
+        // Check prerequisites
+        if (!checkPrerequisites()) {
+          console.error('❌ Prerequisites check failed');
+          return;
+        }
+        
+        console.log('✅ All prerequisites met, initializing chat...');
+        
+        loadChatList();
+        setupSearch();
+        
+        // Initialize WebSocket connection
+        initWebSocket();
+        
+      } catch (error) {
+        console.error('❌ Error during initialization:', error);
+        showToast('Error initializing chat: ' + error.message, 'error');
+      }
     });
   </script>

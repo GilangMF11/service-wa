@@ -178,11 +178,7 @@
       countDisplay.innerText = 'Memuat kontak...';
   
       try {
-        const response = await fetch(`/api/whatsapp/${sessionId}/contacts`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+        const response = await apiCall(`/api/whatsapp/${sessionId}/contacts`);
   
         const data = await response.json();
   
