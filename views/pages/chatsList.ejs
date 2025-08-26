@@ -257,11 +257,13 @@
           // Join session room
           socket.emit('join-session', sessionId);
           showToast('Real-time connection established!', 'success');
+          playSuccessSound();
         });
         
         socket.on('disconnect', () => {
           console.log('🔌 WebSocket disconnected');
           showToast('Real-time connection lost. Reconnecting...', 'warning');
+          playErrorSound();
         });
         
         socket.on('new-message', (messageData) => {
@@ -285,9 +287,42 @@
       }
     }
     
+    // Audio notification functions
     function playNotificationSound() {
-      const audio = new Audio('/assets/sounds/message.mp3');
-      audio.play();
+      // Try to play external audio file first
+      try {
+        const audio = new Audio('/assets/sounds/message.mp3');
+        audio.volume = 0.5;
+        audio.play().catch(() => {
+          // Fallback to Web Audio API
+          if (window.AudioManager) {
+            window.AudioManager.playMessage();
+          }
+        });
+      } catch (error) {
+        // Fallback to Web Audio API
+        if (window.AudioManager) {
+          window.AudioManager.playMessage();
+        }
+      }
+    }
+
+    function playGeneralNotification() {
+      if (window.AudioManager) {
+        window.AudioManager.playNotification();
+      }
+    }
+
+    function playSuccessSound() {
+      if (window.AudioManager) {
+        window.AudioManager.playSuccess();
+      }
+    }
+
+    function playErrorSound() {
+      if (window.AudioManager) {
+        window.AudioManager.playError();
+      }
     }
   
     let currentContactId = null;
@@ -470,6 +505,16 @@
               </div>
             </div>
             <div class="d-flex gap-2">
+              <!-- Audio Controls -->
+              <div class="btn-group btn-group-sm" role="group">
+                <button class="btn btn-outline-success" onclick="toggleAudio()" id="audioToggle" title="Toggle Audio">
+                  <i class="bi bi-volume-up"></i>
+                </button>
+                <button class="btn btn-outline-info" onclick="testAudio()" title="Test Audio">
+                  <i class="bi bi-music-note"></i>
+                </button>
+              </div>
+              <!-- Chat Controls -->
               <button class="btn btn-sm btn-outline-primary" onclick="refreshChatMessages('${contactId}')" title="Refresh messages">
                 <i class="bi bi-arrow-clockwise"></i>
               </button>
@@ -575,6 +620,9 @@
           // Add sent message to UI immediately (optimistic update)
           addMessageToUI(contactId, message, true, Date.now());
           
+          // Play success sound for sent message
+          playSuccessSound();
+          
           // Refresh messages to get any replies
           setTimeout(() => {
             refreshChatMessages(contactId);
@@ -584,10 +632,12 @@
           updateChatListWithLatestMessage(contactId, message);
         } else {
           showToast(data.message || 'Gagal mengirim pesan', 'error');
+          playErrorSound();
         }
       } catch (err) {
         console.error(err);
         showToast('Terjadi kesalahan saat mengirim pesan', 'error');
+        playErrorSound();
       } finally {
         // Restore send button
         const sendButton = input.nextElementSibling;
@@ -658,6 +708,8 @@
               showToast('Pesan baru diterima!', 'info');
               // Update chat list to show unread indicator
               updateChatListUnreadIndicator(contactId, true);
+              // Play notification sound for new messages
+              playNotificationSound();
             }
           }
         }
@@ -727,6 +779,37 @@
       updateChatListUnreadIndicator(contactId, true);
       showToast('Test: Unread indicator added!', 'info');
     }
+
+    // Audio control functions
+    function toggleAudio() {
+      if (window.AudioManager) {
+        const isEnabled = window.AudioManager.isEnabled;
+        window.AudioManager.setEnabled(!isEnabled);
+        
+        // Update button appearance
+        const audioToggle = document.getElementById('audioToggle');
+        if (audioToggle) {
+          if (!isEnabled) {
+            audioToggle.innerHTML = '<i class="bi bi-volume-mute"></i>';
+            audioToggle.className = 'btn btn-outline-danger';
+            showToast('Audio enabled!', 'success');
+          } else {
+            audioToggle.innerHTML = '<i class="bi bi-volume-up"></i>';
+            audioToggle.className = 'btn btn-outline-success';
+            showToast('Audio disabled!', 'info');
+          }
+        }
+      }
+    }
+
+    function testAudio() {
+      if (window.AudioManager) {
+        window.AudioManager.testSounds();
+        showToast('Testing all audio sounds...', 'info');
+      } else {
+        showToast('Audio Manager not available', 'error');
+      }
+    }
     
 
     
@@ -755,10 +838,16 @@
         // Add message to current chat
         addMessageToUI(contactId, message, fromMe, timestamp * 1000);
         showToast('Pesan baru diterima!', 'info');
+        
+        // Play message sound for current chat
+        playNotificationSound();
       } else {
         // Update unread indicator for other contacts
         updateChatListUnreadIndicator(contactId, true);
         showToast(`Pesan baru dari ${contactId}`, 'info');
+        
+        // Play notification sound for other contacts
+        playGeneralNotification();
       }
       
       // Update chat list with latest message
