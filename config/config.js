@@ -38,7 +38,8 @@ const config = {
     // WhatsApp Configuration
     whatsapp: {
         sessionTimeout: parseInt(process.env.WHATSAPP_SESSION_TIMEOUT) || 300000, // 5 minutes
-        qrTimeout: parseInt(process.env.WHATSAPP_QR_TIMEOUT) || 60000, // 1 minute
+        qrTimeout: parseInt(process.env.WHATSAPP_QR_TIMEOUT) || 300000, // 5 minutes (diperpanjang)
+        qrRefreshInterval: parseInt(process.env.WHATSAPP_QR_REFRESH_INTERVAL) || 30000, // 30 seconds
         maxSessions: parseInt(process.env.WHATSAPP_MAX_SESSIONS) || 50,
         retryAttempts: parseInt(process.env.WHATSAPP_RETRY_ATTEMPTS) || 3
     },

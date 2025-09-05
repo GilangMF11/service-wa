@@ -261,7 +261,7 @@
             // Use dynamic base URL if available, otherwise fallback to relative URL
             let fullUrl;
             if (window.AppConfig && window.AppConfig.apiBaseUrl) {
-                // If URL already starts with /api, remove it to avoid duplication
+                // If URL already starts with /api, remove /api prefix to avoid duplication
                 if (url.startsWith('/api/')) {
                     fullUrl = `${window.AppConfig.apiBaseUrl}${url.substring(4)}`;
                 } else if (url.startsWith('/')) {

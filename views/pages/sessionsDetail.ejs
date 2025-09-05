@@ -96,9 +96,14 @@
                 <div class="spinner-border text-primary" role="status"></div>
                 <p class="mt-3 text-muted">Menunggu QR Code...</p>
               </div>
-              <button class="btn btn-outline-primary rounded-pill" onclick="refreshQrCode()">
-                <i class="bi bi-arrow-clockwise me-2"></i>Refresh QR
-              </button>
+              <div class="d-flex gap-2 justify-content-center">
+                <button class="btn btn-outline-primary rounded-pill" onclick="refreshQrCode()">
+                  <i class="bi bi-arrow-clockwise me-2"></i>Refresh QR
+                </button>
+                <button class="btn btn-outline-success rounded-pill" onclick="forceCheckStatus()">
+                  <i class="bi bi-check-circle me-2"></i>Check Status
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -237,6 +242,7 @@
   document.getElementById('sessionIdText').textContent = sessionId;
 
   let isConnected = false;
+  let isQrCodeLoading = false;
 
   // Toast function for notifications
   function showToast(message, type = 'info') {
@@ -293,11 +299,22 @@
     });
   }
 
-  async function getStatus() {
+  async function getStatus(forceCheck = false) {
     try {
-      const res = await window.apiCall(`/api/whatsapp/session/${sessionId}/status`);
+      console.log('🔍 Checking status for session:', sessionId, 'forceCheck:', forceCheck);
+      const url = forceCheck 
+        ? `/api/whatsapp/session/${sessionId}/status?forceCheck=true`
+        : `/api/whatsapp/session/${sessionId}/status`;
+        
+      const res = await window.apiCall(url);
       const data = await res.json();
+      
+      console.log('📊 Status response:', data);
       isConnected = data.isConnected;
+      console.log('📊 isConnected:', isConnected);
+      console.log('📊 Response isReady:', data.isReady);
+      console.log('📊 Response phoneNumber:', data.phoneNumber);
+      console.log('📊 Response hasQrCode:', data.hasQrCode);
 
       const status = isConnected ? 'Terhubung' : 'Belum Terhubung';
       const color = isConnected ? 'text-success' : 'text-danger';
@@ -308,17 +325,56 @@
       document.getElementById('statusIcon').className = icon + ' me-2';
 
       if (!isConnected) {
-        await getQrCode(); // hanya ambil QR jika belum connect
+        console.log('📱 Session not connected, checking QR code...');
+        // Cek apakah sudah ada QR code yang valid
+        if (data.hasQrCode && data.qrTimestamp) {
+          const qrAge = Date.now() - data.qrTimestamp;
+          const qrMaxAge = 5 * 60 * 1000; // 5 menit
+          
+          if (qrAge < qrMaxAge) {
+            console.log('📱 QR code masih valid, tidak perlu request ulang');
+            // Tampilkan QR code yang sudah ada jika masih valid
+            const remainingTime = Math.max(0, qrMaxAge - qrAge);
+            const minutes = Math.floor(remainingTime / 60000);
+            const seconds = Math.floor((remainingTime % 60000) / 1000);
+            
+            document.getElementById('qrCodeContainer').innerHTML = `
+              <div class="text-center">
+                <p class="text-muted mb-3">QR Code masih valid</p>
+                <p class="text-info small">Berlaku selama ${minutes}:${seconds.toString().padStart(2, '0')}</p>
+                <button class="btn btn-outline-primary btn-sm" onclick="refreshQrCode()">
+                  <i class="bi bi-arrow-clockwise"></i> Refresh QR
+                </button>
+              </div>`;
+            
+            // Hentikan polling sementara karena QR code masih valid
+            console.log('⏸️ Pausing polling - QR code still valid');
+          } else {
+            console.log('📱 QR code expired, getting new QR code...');
+            await getQrCode();
+          }
+        } else {
+          console.log('📱 No QR code available, getting QR code...');
+          await getQrCode();
+        }
       } else {
+        console.log('✅ Session connected, clearing QR code display...');
+        // Pastikan QR code tidak ditampilkan saat sudah terhubung
+        const phoneNumber = data.phoneNumber ? ` (${data.phoneNumber})` : '';
         document.getElementById('qrCodeContainer').innerHTML = `
           <div class="text-success p-4">
             <i class="bi bi-check-circle-fill fs-1"></i>
             <h5 class="mt-3">Sudah Terhubung</h5>
-            <p class="text-muted">WhatsApp berhasil terhubung</p>
+            <p class="text-muted">WhatsApp berhasil terhubung${phoneNumber}</p>
           </div>`;
+        
+        // Hentikan polling saat sudah terhubung
+        stopStatusPolling();
+        console.log('🛑 Stopped polling - session connected');
       }
 
     } catch (err) {
+      console.error('❌ Error checking status:', err);
       document.getElementById('statusText').textContent = 'Gagal cek status';
       document.getElementById('statusText').className = 'text-warning fw-bold';
       document.getElementById('statusIcon').className = 'bi-exclamation-circle-fill text-warning me-2';
@@ -326,24 +382,65 @@
     }
   }
 
-  async function getQrCode() {
+  async function getQrCode(forceRefresh = false) {
+    // Cek apakah sudah terhubung
+    if (isConnected) {
+      console.log('⚠️ Session already connected, skipping QR code request');
+      return;
+    }
+    
+    // Cek apakah sedang dalam proses authentication
+    if (window.isAuthenticating) {
+      console.log('⚠️ Session is authenticating, skipping QR code request');
+      return;
+    }
+    
+    // Prevent multiple simultaneous QR code requests
+    if (isQrCodeLoading) {
+      console.log('⚠️ QR Code request already in progress, skipping...');
+      return;
+    }
+    
+    console.log('📱 Getting QR code for session:', sessionId, 'forceRefresh:', forceRefresh);
+    isQrCodeLoading = true;
     document.getElementById('qrCodeContainer').innerHTML = `
       <div class="spinner-border text-primary" role="status"></div>
       <p class="mt-3 text-muted">Memuat QR Code...</p>
     `;
     
     try {
-      const res = await window.apiCall(`/api/whatsapp/session/${sessionId}/qrcode`);
+      const url = forceRefresh 
+        ? `/api/whatsapp/session/${sessionId}/qrcode?forceRefresh=true`
+        : `/api/whatsapp/session/${sessionId}/qrcode`;
+        
+      console.log('🌐 Requesting QR code from:', url);
+      const res = await window.apiCall(url);
       const data = await res.json();
+      
+      console.log('📱 QR code response:', data);
       
       if (data.success) {
         const qr = data.qrCode;
+        const expiresIn = data.expiresIn || 300; // Default 5 menit
+        const qrAge = data.qrAge || 0;
+        
         const qrImg = `
           <div class="qr-wrapper p-3 border rounded shadow-sm">
             <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qr)}" alt="QR Code">
             <p class="mt-3 text-muted mb-0">Scan QR code dengan WhatsApp di ponsel Anda</p>
+            <small class="text-muted">QR Code berlaku ${Math.floor(expiresIn / 60)} menit ${expiresIn % 60} detik</small>
           </div>`;
         document.getElementById('qrCodeContainer').innerHTML = qrImg;
+        
+        // Set timer untuk refresh QR code jika expired
+        if (expiresIn > 0) {
+          setTimeout(() => {
+            if (!isConnected) {
+              console.log('🔄 QR Code expired, refreshing...');
+              getQrCode(true);
+            }
+          }, expiresIn * 1000);
+        }
       } else {
         document.getElementById('qrCodeContainer').innerHTML = `
           <div class="text-muted p-4">
@@ -361,15 +458,40 @@
           <p class="text-muted">Silakan coba refresh</p>
         </div>`;
       showToast('Gagal memuat QR Code', 'error');
+    } finally {
+      isQrCodeLoading = false;
     }
   }
 
   function refreshQrCode() {
     if (!isConnected) {
-      getQrCode();
+      getQrCode(true); // Force refresh
       showToast('Menyegarkan QR Code', 'info');
+      // Mulai polling ulang setelah refresh QR
+      startStatusPolling();
     } else {
       showToast('Session sudah terhubung. Tidak perlu scan ulang.', 'warning');
+      // Update UI untuk memastikan status terhubung ditampilkan
+      const phoneNumber = clients[sessionId]?.phoneNumber ? ` (${clients[sessionId].phoneNumber})` : '';
+      document.getElementById('qrCodeContainer').innerHTML = `
+        <div class="text-success p-4">
+          <i class="bi bi-check-circle-fill fs-1"></i>
+          <h5 class="mt-3">Sudah Terhubung</h5>
+          <p class="text-muted">WhatsApp berhasil terhubung${phoneNumber}</p>
+        </div>`;
+    }
+  }
+
+  async function forceCheckStatus() {
+    console.log('🔄 Force checking status...');
+    showToast('Memeriksa status koneksi...', 'info');
+    
+    try {
+      await getStatus(true); // Force check
+      showToast('Status berhasil diperbarui', 'success');
+    } catch (error) {
+      console.error('❌ Error force checking status:', error);
+      showToast('Gagal memeriksa status', 'error');
     }
   }
 
@@ -530,8 +652,167 @@
     }
   }
 
+  // Polling untuk status session
+  let statusPollingInterval = null;
+  let pollingCount = 0;
+  
+  function startStatusPolling() {
+    // Hentikan polling sebelumnya jika ada
+    if (statusPollingInterval) {
+      clearInterval(statusPollingInterval);
+    }
+    
+    console.log('🔄 Starting status polling for session:', sessionId);
+    pollingCount = 0;
+    
+    // Polling setiap 15 detik untuk mengurangi beban server
+    statusPollingInterval = setInterval(async () => {
+      pollingCount++;
+      console.log('🔄 Polling status, isConnected:', isConnected, 'count:', pollingCount);
+      
+      if (!isConnected) {
+        // Gunakan force check setiap 2 kali polling (30 detik)
+        const useForceCheck = pollingCount % 2 === 0;
+        await getStatus(useForceCheck);
+      } else {
+        // Hentikan polling jika sudah terhubung
+        console.log('✅ Session connected, stopping polling');
+        clearInterval(statusPollingInterval);
+        statusPollingInterval = null;
+        pollingCount = 0;
+        
+        // Pastikan QR code tidak ditampilkan
+        const phoneNumber = clients[sessionId]?.phoneNumber ? ` (${clients[sessionId].phoneNumber})` : '';
+        document.getElementById('qrCodeContainer').innerHTML = `
+          <div class="text-success p-4">
+            <i class="bi bi-check-circle-fill fs-1"></i>
+            <h5 class="mt-3">Sudah Terhubung</h5>
+            <p class="text-muted">WhatsApp berhasil terhubung${phoneNumber}</p>
+          </div>`;
+      }
+    }, 15000);
+  }
+  
+  function stopStatusPolling() {
+    if (statusPollingInterval) {
+      clearInterval(statusPollingInterval);
+      statusPollingInterval = null;
+    }
+  }
+
+  // Socket.IO listener untuk session ready
+  function setupSocketListeners() {
+    if (typeof io !== 'undefined') {
+      console.log('🔌 Setting up Socket.IO listeners for session:', sessionId);
+      const socket = io();
+      
+      socket.on('connect', function() {
+        console.log('🔌 Socket.IO connected');
+        // Join room untuk session ini
+        socket.emit('join-session', sessionId);
+        console.log('📱 Joined session room:', sessionId);
+      });
+      
+      socket.on('disconnect', function() {
+        console.log('🔌 Socket.IO disconnected');
+      });
+      
+      socket.on('session-ready', function(data) {
+        console.log('📡 Received session-ready event:', data);
+        if (data.sessionId === sessionId) {
+          console.log('✅ Session ready event for current session');
+          console.log('📊 Event type:', data.event || 'ready');
+          isConnected = true;
+          window.isAuthenticating = false; // Reset authentication flag
+          
+          // Update UI
+          const status = 'Terhubung';
+          const color = 'text-success';
+          const icon = 'bi-check-circle-fill text-success';
+          
+          document.getElementById('statusText').textContent = status;
+          document.getElementById('statusText').className = color + ' fw-bold';
+          document.getElementById('statusIcon').className = icon + ' me-2';
+          
+          const phoneNumber = data.phoneNumber ? ` (${data.phoneNumber})` : '';
+          const eventType = data.event === 'authenticated' ? 'Authentication berhasil' : 'WhatsApp berhasil terhubung';
+          
+          document.getElementById('qrCodeContainer').innerHTML = `
+            <div class="text-success p-4">
+              <i class="bi bi-check-circle-fill fs-1"></i>
+              <h5 class="mt-3">Sudah Terhubung</h5>
+              <p class="text-muted">${eventType}${phoneNumber}</p>
+              <p class="text-muted small">Terhubung pada: ${new Date(data.timestamp).toLocaleString()}</p>
+            </div>`;
+          
+          // Hentikan polling dan reset counter
+          stopStatusPolling();
+          pollingCount = 0;
+          
+          const toastMessage = data.event === 'authenticated' ? 'Authentication berhasil!' : 'WhatsApp berhasil terhubung!';
+          showToast(toastMessage, 'success');
+          console.log('🛑 Stopped polling due to session-ready event');
+          
+          // Force check status untuk memastikan sinkronisasi
+          setTimeout(() => {
+            console.log('🔄 Force checking status after session-ready event');
+            getStatus(true);
+          }, 1000);
+        } else {
+          console.log('⚠️ Session ready event for different session:', data.sessionId);
+        }
+      });
+      
+      socket.on('error', function(error) {
+        console.error('🔌 Socket.IO error:', error);
+      });
+      
+      // Event untuk mendeteksi pairing (QR code sedang diproses)
+      socket.on('session-pairing', function(data) {
+        console.log('🔗 Received session-pairing event:', data);
+        if (data.sessionId === sessionId) {
+          console.log('🔗 Session pairing for current session');
+          window.isAuthenticating = true; // Set authentication flag
+          
+          // Update UI untuk menunjukkan proses pairing
+          document.getElementById('qrCodeContainer').innerHTML = `
+            <div class="text-info p-4">
+              <div class="spinner-border text-info" role="status"></div>
+              <h5 class="mt-3">Memproses QR Code</h5>
+              <p class="text-muted">QR code sedang diproses, harap tunggu...</p>
+            </div>`;
+          
+          showToast('QR code sedang diproses...', 'info');
+        }
+      });
+      
+      // Event untuk mendeteksi opening (WhatsApp sedang dibuka)
+      socket.on('session-opening', function(data) {
+        console.log('🔄 Received session-opening event:', data);
+        if (data.sessionId === sessionId) {
+          console.log('🔄 Session opening for current session');
+          
+          // Update UI untuk menunjukkan proses opening
+          document.getElementById('qrCodeContainer').innerHTML = `
+            <div class="text-warning p-4">
+              <div class="spinner-border text-warning" role="status"></div>
+              <h5 class="mt-3">Membuka WhatsApp</h5>
+              <p class="text-muted">WhatsApp sedang dibuka, harap tunggu...</p>
+            </div>`;
+          
+          showToast('WhatsApp sedang dibuka...', 'info');
+        }
+      });
+    } else {
+      console.warn('⚠️ Socket.IO not available');
+    }
+  }
+
   // Inisialisasi saat halaman dibuka
   document.addEventListener('DOMContentLoaded', function() {
+    // Setup Socket.IO listeners
+    setupSocketListeners();
+    
     // Fetch session details
     (async function() {
       try {
@@ -548,5 +829,13 @@
     
     // Check status and get QR if needed
     getStatus();
+    
+    // Mulai polling status
+    startStatusPolling();
+  });
+  
+  // Hentikan polling saat halaman ditutup
+  window.addEventListener('beforeunload', function() {
+    stopStatusPolling();
   });
 </script>

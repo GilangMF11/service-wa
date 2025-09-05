@@ -87,18 +87,92 @@ if (!fs.existsSync(BROADCAST_UPLOAD_DIR)) {
 // Fungsi untuk membuat client WhatsApp baru berdasarkan data dari database
 const createWhatsAppClient = async (sessionRecord) => {
     const { session_id, user_id, description } = sessionRecord;
-    const sessionDir = path.join(SESSION_DIR, `session-${session_id}`);
     
-    // Buat client baru
+    // Gunakan timestamp untuk membuat direktori session yang unik
+    const timestamp = Date.now();
+    const sessionDir = path.join(SESSION_DIR, `session-${session_id}-${timestamp}`);
+    
+    // Pastikan direktori session ada
+    if (!fs.existsSync(sessionDir)) {
+        fs.mkdirSync(sessionDir, { recursive: true });
+    }
+    
+    // Buat client baru dengan konfigurasi yang lebih robust untuk mengatasi ready callback issue
     const client = new Client({
         authStrategy: new LocalAuth({ 
-            clientId: `session-${session_id}`,
+            clientId: `session-${session_id}-${timestamp}`,
             dataPath: sessionDir
         }),
         puppeteer: {
             headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
-        }
+            args: [
+                '--no-sandbox', 
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--no-first-run',
+                '--disable-default-apps',
+                '--disable-extensions',
+                '--disable-web-security',
+                '--disable-features=VizDisplayCompositor',
+                '--disable-plugins',
+                '--disable-images',
+                '--disable-javascript',
+                '--disable-sync',
+                '--disable-translate',
+                '--hide-scrollbars',
+                '--mute-audio',
+                '--no-default-browser-check',
+                '--no-pings',
+                '--password-store=basic',
+                '--use-mock-keychain',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-renderer-backgrounding',
+                '--disable-features=TranslateUI',
+                '--disable-ipc-flooding-protection',
+                '--disable-blink-features=AutomationControlled',
+                '--disable-features=VizDisplayCompositor',
+                '--disable-accelerated-2d-canvas',
+                '--disable-accelerated-jpeg-decoding',
+                '--disable-accelerated-mjpeg-decode',
+                '--disable-accelerated-video-decode',
+                '--disable-background-networking',
+                '--disable-background-timer-throttling',
+                '--disable-client-side-phishing-detection',
+                '--disable-component-extensions-with-background-pages',
+                '--disable-default-apps',
+                '--disable-dev-shm-usage',
+                '--disable-extensions',
+                '--disable-features=TranslateUI',
+                '--disable-hang-monitor',
+                '--disable-ipc-flooding-protection',
+                '--disable-popup-blocking',
+                '--disable-prompt-on-repost',
+                '--disable-renderer-backgrounding',
+                '--disable-sync',
+                '--disable-translate',
+                '--disable-windows10-custom-titlebar',
+                '--metrics-recording-only',
+                '--no-first-run',
+                '--safebrowsing-disable-auto-update',
+                '--enable-automation',
+                '--password-store=basic',
+                '--use-mock-keychain'
+            ]
+        },
+        webVersionCache: {
+            type: 'remote',
+            remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html'
+        },
+        restartOnAuthFail: true,
+        takeoverOnConflict: false,
+        takeoverTimeoutMs: 0,
+        // Tambahan konfigurasi untuk mengatasi ready callback issue
+        qrMaxRetries: 5,
+        qrTimeout: 60000,
+        authTimeoutMs: 60000,
+        qrRefreshInterval: 20000
     });
 
     // Simpan status koneksi
@@ -109,28 +183,340 @@ const createWhatsAppClient = async (sessionRecord) => {
         qrCode: null,
         qrTimestamp: null, // Tambahkan timestamp untuk QR code
         createdAt: new Date().toISOString(),
-        description: description || null
+        description: description || null,
+        sessionDir: sessionDir // Simpan path direktori session
     };
+    
+    // Timeout mechanism untuk menangani ready callback yang tidak terpicu
+    let readyTimeout = setTimeout(() => {
+        console.log(`⚠️ Ready callback timeout for session ${session_id}, checking client state...`);
+        console.log(`📱 Client state: ${client.state}`);
+        console.log(`📱 Client info:`, client.info);
+        console.log(`📱 Client isReady: ${clients[session_id].isReady}`);
+        
+        if (client.state === 'CONNECTED' && !clients[session_id].isReady) {
+            console.log(`🔄 Force updating client status due to timeout...`);
+            clients[session_id].isReady = true;
+            clients[session_id].lastActivity = new Date().toISOString();
+            clients[session_id].phoneNumber = client.info?.wid || null;
+            clients[session_id].qrCode = null;
+            
+            // Update database
+            whatsappSessionQueries.updateSessionStatus(session_id, true).catch(err => {
+                console.error(`❌ Error updating database after timeout:`, err);
+            });
+            
+            // Emit socket event
+            io.emit('session-ready', { 
+                sessionId: session_id, 
+                phoneNumber: clients[session_id].phoneNumber,
+                timestamp: new Date().toISOString()
+            });
+            
+            console.log(`✅ Client status force updated after timeout`);
+        } else if (client.state === 'OPENING' && !clients[session_id].isReady) {
+            console.log(`🔄 Client is opening, waiting 10 more seconds...`);
+            // Extend timeout untuk OPENING state
+            setTimeout(() => {
+                if (client.state === 'CONNECTED' && !clients[session_id].isReady) {
+                    console.log(`🔄 Force updating client status after extended timeout...`);
+                    clients[session_id].isReady = true;
+                    clients[session_id].lastActivity = new Date().toISOString();
+                    clients[session_id].phoneNumber = client.info?.wid || null;
+                    clients[session_id].qrCode = null;
+                    
+                    // Update database
+                    whatsappSessionQueries.updateSessionStatus(session_id, true).catch(err => {
+                        console.error(`❌ Error updating database after extended timeout:`, err);
+                    });
+                    
+                    // Emit socket event
+                    io.emit('session-ready', { 
+                        sessionId: session_id, 
+                        phoneNumber: clients[session_id].phoneNumber,
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                    console.log(`✅ Client status force updated after extended timeout`);
+                }
+            }, 10000); // 10 detik tambahan
+        }
+    }, 30000); // 30 detik timeout
+    
+    // Polling mechanism untuk menangani event handler yang tidak terpicu
+    let pollingInterval = setInterval(async () => {
+        if (client && !clients[session_id].isReady) {
+            console.log(`🔄 Polling client state for session ${session_id}...`);
+            console.log(`📱 Client state: ${client.state}`);
+            console.log(`📱 Client info:`, client.info);
+            console.log(`📱 Client type:`, typeof client);
+            console.log(`📱 Client keys:`, Object.keys(client || {}));
+            
+            // Cek apakah client memiliki method getState atau getInfo
+            if (typeof client.getState === 'function') {
+                try {
+                    // Cek apakah client page siap
+                    if (!client.pupPage) {
+                        console.log(`📱 Polling: Client page not ready for ${session_id}`);
+                        return;
+                    }
+                    
+                    const state = await client.getState();
+                    console.log(`📱 Client getState(): ${state}`);
+                } catch (err) {
+                    console.log(`📱 Error calling getState():`, err.message);
+                    // Jika error getState, coba restart client
+                    if (err.message.includes('evaluate') || err.message.includes('null')) {
+                        console.log(`🔄 Polling detected client issue, attempting restart...`);
+                        try {
+                            await client.destroy();
+                            await new Promise(resolve => setTimeout(resolve, 5000));
+                            await createWhatsAppClient(session_id);
+                            console.log(`✅ Client restarted via polling`);
+                        } catch (restartError) {
+                            console.log(`❌ Failed to restart client via polling:`, restartError.message);
+                        }
+                    }
+                }
+            }
+            
+            if (typeof client.getInfo === 'function') {
+                try {
+                    const info = client.getInfo();
+                    console.log(`📱 Client getInfo():`, info);
+                } catch (err) {
+                    console.log(`📱 Error calling getInfo():`, err.message);
+                }
+            }
+            
+            // Cek state dari getState() result jika tersedia
+            let actualState = client.state;
+            if (typeof client.getState === 'function') {
+                try {
+                    const stateResult = await client.getState();
+                    if (stateResult) {
+                        actualState = stateResult;
+                        console.log(`📱 Polling getState() result: ${actualState}`);
+                    }
+                } catch (err) {
+                    console.log(`📱 Polling getState() error:`, err.message);
+                }
+            }
+            
+            // Fallback: Coba akses properti langsung
+            if (actualState === 'CONNECTED' && client.info && client.info.wid) {
+                console.log(`🔄 Polling detected CONNECTED state, updating client status...`);
+                clients[session_id].isReady = true;
+                clients[session_id].lastActivity = new Date().toISOString();
+                clients[session_id].phoneNumber = client.info.wid;
+                clients[session_id].qrCode = null;
+                
+                // Clear timeout dan polling
+                if (readyTimeout) {
+                    clearTimeout(readyTimeout);
+                }
+                clearInterval(pollingInterval);
+                
+                // Update database
+                whatsappSessionQueries.updateSessionStatus(session_id, true).catch(err => {
+                    console.error(`❌ Error updating database after polling:`, err);
+                });
+                
+                // Emit socket event
+                io.emit('session-ready', { 
+                    sessionId: session_id, 
+                    phoneNumber: clients[session_id].phoneNumber,
+                    timestamp: new Date().toISOString()
+                });
+                
+                console.log(`✅ Client status updated via polling`);
+            } else if (actualState === 'CONNECTED' && client.info) {
+                // Jika state CONNECTED tapi belum ada wid, coba ambil dari info
+                console.log(`🔄 Polling detected CONNECTED state with info, updating client status...`);
+                clients[session_id].isReady = true;
+                clients[session_id].lastActivity = new Date().toISOString();
+                clients[session_id].phoneNumber = client.info.wid || client.info.me || 'Unknown';
+                clients[session_id].qrCode = null;
+                
+                // Clear timeout dan polling
+                if (readyTimeout) {
+                    clearTimeout(readyTimeout);
+                }
+                clearInterval(pollingInterval);
+                
+                // Update database
+                whatsappSessionQueries.updateSessionStatus(session_id, true).catch(err => {
+                    console.error(`❌ Error updating database after polling:`, err);
+                });
+                
+                // Emit socket event
+                io.emit('session-ready', { 
+                    sessionId: session_id, 
+                    phoneNumber: clients[session_id].phoneNumber,
+                    timestamp: new Date().toISOString()
+                });
+                
+                console.log(`✅ Client status updated via polling with info`);
+            } else if (client.state === 'OPENING' || client.state === 'PAIRING') {
+                console.log(`📱 Client is ${client.state}, waiting...`);
+            } else if (client.state === 'UNPAIRED' || client.state === 'UNLAUNCHED') {
+                console.log(`📱 Client is ${client.state}, may need to restart...`);
+            } else {
+                console.log(`📱 Client state unknown: ${client.state}, checking if client is working...`);
+                
+                // Fallback: Coba cek apakah client bisa mengirim pesan atau tidak
+                if (typeof client.sendMessage === 'function') {
+                    console.log(`📱 Client has sendMessage method, but waiting for proper connection...`);
+                    // JANGAN set isReady=true di sini, biarkan event handler yang menangani
+                    // Hanya log untuk debugging
+                }
+            }
+        } else if (clients[session_id].isReady) {
+            // Clear polling jika sudah ready
+            clearInterval(pollingInterval);
+        }
+    }, 5000); // Poll setiap 5 detik
+
+    // Cleanup direktori session lama (jika ada)
+    setTimeout(async () => {
+        try {
+            const oldSessionDir = path.join(SESSION_DIR, `session-${session_id}`);
+            if (fs.existsSync(oldSessionDir)) {
+                console.log(`🧹 Cleaning up old session directory: ${oldSessionDir}`);
+                await removeDirectoryWithRetry(oldSessionDir, 2);
+            }
+        } catch (cleanupError) {
+            console.warn(`⚠️ Error cleaning up old session directory:`, cleanupError.message);
+        }
+    }, 5000); // Cleanup setelah 5 detik
 
     // Event saat QR code tersedia untuk di-scan
     client.on('qr', async (qr) => {
-        //console.log(`QR Code untuk session ${session_id} tersedia:`);
-        //qrcode.generate(qr, { small: true });
+        // Cek apakah client sudah authenticated/ready - jika ya, jangan generate QR lagi
+        if (clients[session_id].isReady || client.state === 'CONNECTED') {
+            console.log(`📱 Client untuk session ${session_id} sudah ready/connected, tidak perlu QR code lagi`);
+            console.log(`📱 Client state: ${client.state}, isReady: ${clients[session_id].isReady}`);
+            return;
+        }
+        
+        // Cek apakah QR code sudah ada dan sama untuk mencegah duplikasi
+        if (clients[session_id].qrCode === qr) {
+            console.log(`📱 QR Code untuk session ${session_id} sudah ada, skipping...`);
+            return;
+        }
+        
+        console.log(`📱 QR Code untuk session ${session_id} tersedia!`);
+        console.log(`📱 QR Code length: ${qr.length}`);
+        console.log(`📱 Client state saat QR: ${client.state}`);
         clients[session_id].qrCode = qr;
         clients[session_id].qrTimestamp = Date.now(); // Catat waktu QR code dibuat
+        console.log(`📱 QR Code saved for session ${session_id}`);
     });
 
-    // Event saat client siap
+    // Event saat client siap - dengan fallback mechanism untuk fork BenyFilho
     client.on('ready', async () => {
-        clients[session_id].isReady = true;
-        clients[session_id].qrCode = null;
-        console.log(`Client WhatsApp untuk session ${session_id} siap!`);
+        console.log(`🚀🚀🚀 READY EVENT TRIGGERED untuk session ${session_id} (BenyFilho fork) 🚀🚀🚀`);
+        console.log(`📱 Phone number: ${client.info?.wid || 'Unknown'}`);
+        console.log(`📱 Client state: ${client.state || 'Unknown'}`);
+        console.log(`📱 Client info:`, client.info);
+        console.log(`📱 Client info type:`, typeof client.info);
+        console.log(`📱 Client info wid:`, client.info?.wid);
+        console.log(`📱 Client info me:`, client.info?.me);
+        console.log(`📱 Client info pushname:`, client.info?.pushname);
+        console.log(`📱 Current client data before update:`, {
+            isReady: clients[session_id]?.isReady,
+            phoneNumber: clients[session_id]?.phoneNumber,
+            lastActivity: clients[session_id]?.lastActivity
+        });
+        
+        // Fallback: Jika client.info tidak ada, tunggu sebentar dan coba lagi
+        if (!client.info || !client.info.wid) {
+            console.log(`⚠️ Client info not available, waiting 2 seconds and retrying...`);
+            setTimeout(async () => {
+                if (client.info && client.info.wid) {
+                    console.log(`📱 Retry successful - Phone number: ${client.info.wid}`);
+                    await updateClientStatus();
+                } else {
+                    console.log(`⚠️ Retry failed - Client info still not available`);
+                }
+            }, 2000);
+        } else {
+            await updateClientStatus();
+        }
+        
+        async function updateClientStatus() {
+            // Clear timeout karena ready event berhasil terpicu
+            if (readyTimeout) {
+                clearTimeout(readyTimeout);
+                console.log(`✅ Ready event triggered, cleared timeout for session ${session_id}`);
+            }
+        
+            // Update client data - tidak ada skip untuk memastikan update
+            clients[session_id].isReady = true;
+            clients[session_id].qrCode = null;
+            clients[session_id].lastActivity = new Date().toISOString();
+            clients[session_id].phoneNumber = client.info?.wid || null;
+        
+        console.log(`📊 READY EVENT - Updated client data for session ${session_id}:`, {
+            isReady: clients[session_id].isReady,
+            phoneNumber: clients[session_id].phoneNumber,
+            lastActivity: clients[session_id].lastActivity,
+            qrCode: clients[session_id].qrCode
+        });
+        
+        console.log(`📊 Updated client data:`, {
+            isReady: clients[session_id].isReady,
+            phoneNumber: clients[session_id].phoneNumber,
+            lastActivity: clients[session_id].lastActivity
+        });
         
         // Update status di database
         try {
             await whatsappSessionQueries.updateSessionStatus(session_id, true);
+            console.log(`✅ Status session ${session_id} berhasil diperbarui di database`);
+            
+            // Update juga last_activity di database
+            try {
+                await whatsappSessionQueries.updateSessionActivity(session_id);
+                console.log(`✅ Last activity updated for session ${session_id}`);
+            } catch (activityError) {
+                console.warn(`⚠️ Error updating last activity:`, activityError.message);
+            }
         } catch (error) {
-            console.error(`Error saat memperbarui status session ${session_id}:`, error);
+            console.error(`❌ Error saat memperbarui status session ${session_id}:`, error);
+        }
+        
+        // Emit event ke frontend melalui Socket.IO jika tersedia
+        try {
+            const { getIO } = require('./socket');
+            const io = getIO();
+            if (io) {
+                const eventData = {
+                    sessionId: session_id,
+                    isReady: true,
+                    phoneNumber: client.info?.wid || null,
+                    timestamp: new Date().toISOString()
+                };
+                
+                io.to(`session-${session_id}`).emit('session-ready', eventData);
+                console.log(`📡 Event session-ready dikirim untuk session ${session_id}:`, eventData);
+            } else {
+                console.warn(`⚠️ Socket.IO tidak tersedia untuk session ${session_id}`);
+            }
+        } catch (socketError) {
+            console.warn(`⚠️ Socket.IO error untuk session ${session_id}:`, socketError.message);
+        }
+        
+        // Force update status setelah 2 detik untuk memastikan sinkronisasi
+        setTimeout(async () => {
+            console.log(`🔄 Force updating status for session ${session_id}`);
+            try {
+                await whatsappSessionQueries.updateSessionStatus(session_id, true);
+                console.log(`✅ Force update completed for session ${session_id}`);
+            } catch (error) {
+                console.error(`❌ Force update failed for session ${session_id}:`, error);
+            }
+        }, 2000);
         }
     });
 
@@ -149,7 +535,250 @@ const createWhatsAppClient = async (sessionRecord) => {
 
     // Event untuk menangani error
     client.on('auth_failure', (error) => {
-        console.error(`Auth failure for session ${session_id}:`, error);
+        console.error(`❌ Auth failure for session ${session_id}:`, error);
+        clients[session_id].isReady = false;
+    });
+
+    // Event untuk debugging - REMOVED (duplicate)
+    // client.on('loading_screen', (percent, message) => {
+    //     console.log(`📱 Loading screen for session ${session_id}: ${percent}% - ${message}`);
+    // });
+
+    // client.on('remote_session_saved', () => {
+    //     console.log(`📱 Remote session saved for session ${session_id}`);
+    // });
+
+    // Event untuk mendeteksi QR code scan - REMOVED (duplicate)
+    // client.on('qr', (qr) => {
+    //     console.log(`📱 QR Code generated for session ${session_id}`);
+    //     console.log(`📱 QR Code length: ${qr ? qr.length : 0}`);
+    // });
+
+    // Event untuk mendeteksi authentication
+    client.on('authenticated', async () => {
+        console.log(`✅✅✅ AUTHENTICATED EVENT TRIGGERED untuk session ${session_id} (BenyFilho fork) ✅✅✅`);
+        console.log(`📱 Client state saat authenticated: ${client.state}`);
+        console.log(`📱 Client info saat authenticated:`, client.info);
+        console.log(`📱 Client info type:`, typeof client.info);
+        console.log(`📱 Client info wid:`, client.info?.wid);
+        console.log(`📱 Client info me:`, client.info?.me);
+        console.log(`📱 Client info pushname:`, client.info?.pushname);
+        console.log(`📱 Current client data before update:`, {
+            isReady: clients[session_id]?.isReady,
+            phoneNumber: clients[session_id]?.phoneNumber,
+            lastActivity: clients[session_id]?.lastActivity
+        });
+        
+        // Update status di database saat authentication berhasil
+        try {
+            await whatsappSessionQueries.updateSessionStatus(session_id, true);
+            console.log(`✅ Status updated in database for authentication: ${session_id}`);
+            
+            // Update juga last_activity
+            try {
+                await whatsappSessionQueries.updateSessionActivity(session_id);
+                console.log(`✅ Last activity updated for authentication: ${session_id}`);
+            } catch (activityError) {
+                console.warn(`⚠️ Error updating last activity for authentication:`, activityError.message);
+            }
+        } catch (error) {
+            console.error(`❌ Error updating status for authentication ${session_id}:`, error);
+        }
+        
+        // Update client data
+        clients[session_id].isReady = true;
+        clients[session_id].lastActivity = new Date().toISOString();
+        clients[session_id].phoneNumber = client.info?.wid || null;
+        clients[session_id].qrCode = null; // Clear QR code saat authenticated
+        
+        console.log(`📊 AUTHENTICATED EVENT - Updated client data for session ${session_id}:`, {
+            isReady: clients[session_id].isReady,
+            phoneNumber: clients[session_id].phoneNumber,
+            lastActivity: clients[session_id].lastActivity,
+            qrCode: clients[session_id].qrCode
+        });
+        
+        // Emit event ke frontend
+        try {
+            const { getIO } = require('./socket');
+            const io = getIO();
+            if (io) {
+                const eventData = {
+                    sessionId: session_id,
+                    isReady: true,
+                    phoneNumber: client.info?.wid || null,
+                    timestamp: new Date().toISOString(),
+                    event: 'authenticated'
+                };
+                
+                io.to(`session-${session_id}`).emit('session-ready', eventData);
+                console.log(`📡 Authentication event emitted for session ${session_id}:`, eventData);
+            }
+        } catch (socketError) {
+            console.warn(`⚠️ Socket.IO error for authentication:`, socketError.message);
+        }
+    });
+
+    // Event untuk mendeteksi authentication failure
+    client.on('auth_failure', (msg) => {
+        console.error(`❌ Authentication failed for session ${session_id}:`, msg);
+        clients[session_id].isReady = false;
+    });
+
+    // Event untuk mendeteksi session saved
+    client.on('remote_session_saved', () => {
+        console.log(`📱 Remote session saved for session ${session_id}`);
+        console.log(`📱 Client state saat session saved: ${client.state}`);
+        // Pastikan status terupdate saat session saved
+        if (client.state === 'CONNECTED' || client.state === 'OPENING') {
+            clients[session_id].isReady = true;
+            clients[session_id].lastActivity = new Date().toISOString();
+            clients[session_id].phoneNumber = client.info?.wid || null;
+            console.log(`📱 Session saved - updated client data for session ${session_id}`);
+            
+            // Update database
+            whatsappSessionQueries.updateSessionStatus(session_id, true).catch(err => {
+                console.error(`❌ Error updating status for session saved:`, err);
+            });
+        }
+    });
+
+    // Event untuk mendeteksi loading screen
+    client.on('loading_screen', (percent, message) => {
+        console.log(`📱 Loading screen for session ${session_id}: ${percent}% - ${message}`);
+        // Jika loading screen menunjukkan progress, mungkin client sedang connecting
+        if (percent > 50) {
+            console.log(`📱 Loading progress high, checking if client is connecting...`);
+        }
+    });
+
+    // Event untuk mendeteksi perubahan status
+    client.on('change_state', (state) => {
+        console.log(`📱 State change for session ${session_id}: ${state}`);
+        console.log(`📱 Client info:`, {
+            isReady: clients[session_id]?.isReady,
+            phoneNumber: client.info?.wid,
+            state: client.state
+        });
+        
+        // Update status berdasarkan state
+        if (state === 'CONNECTED') {
+            console.log(`✅✅✅ CHANGE_STATE CONNECTED EVENT TRIGGERED untuk session ${session_id} (BenyFilho fork) ✅✅✅`);
+            console.log(`📱 Client info saat CONNECTED:`, client.info);
+            console.log(`📱 Client info type:`, typeof client.info);
+            console.log(`📱 Client info wid:`, client.info?.wid);
+            console.log(`📱 Client info me:`, client.info?.me);
+            console.log(`📱 Client info pushname:`, client.info?.pushname);
+            console.log(`📱 Current client data before update:`, {
+                isReady: clients[session_id]?.isReady,
+                phoneNumber: clients[session_id]?.phoneNumber,
+                lastActivity: clients[session_id]?.lastActivity
+            });
+            
+            clients[session_id].isReady = true;
+            clients[session_id].lastActivity = new Date().toISOString();
+            clients[session_id].phoneNumber = client.info?.wid || null;
+            clients[session_id].qrCode = null; // Clear QR code saat terhubung
+            
+            console.log(`📊 CHANGE_STATE CONNECTED - Updated client data for session ${session_id}:`, {
+                isReady: clients[session_id].isReady,
+                phoneNumber: clients[session_id].phoneNumber,
+                lastActivity: clients[session_id].lastActivity,
+                qrCode: clients[session_id].qrCode
+            });
+            
+            // Update database
+            whatsappSessionQueries.updateSessionStatus(session_id, true).then(async () => {
+                console.log(`✅ Status updated for state change: ${session_id}`);
+                // Update juga last_activity
+                try {
+                    await whatsappSessionQueries.updateSessionActivity(session_id);
+                    console.log(`✅ Last activity updated for state change: ${session_id}`);
+                } catch (activityError) {
+                    console.warn(`⚠️ Error updating last activity for state change:`, activityError.message);
+                }
+            }).catch(err => {
+                console.error(`❌ Error updating status for state change:`, err);
+            });
+            
+            // Emit event ke frontend
+            try {
+                const { getIO } = require('./socket');
+                const io = getIO();
+                if (io) {
+                    io.to(`session-${session_id}`).emit('session-ready', {
+                        sessionId: session_id,
+                        isReady: true,
+                        phoneNumber: client.info?.wid || null,
+                        timestamp: new Date().toISOString()
+                    });
+                    console.log(`📡 Session-ready event emitted for state change: ${session_id}`);
+                }
+            } catch (socketError) {
+                console.warn(`⚠️ Socket.IO error for state change:`, socketError.message);
+            }
+        } else if (state === 'DISCONNECTED') {
+            console.log(`❌ Client disconnected for session ${session_id}`);
+            clients[session_id].isReady = false;
+            
+            // Update database
+            whatsappSessionQueries.updateSessionStatus(session_id, false).catch(err => {
+                console.error(`❌ Error updating status for disconnection:`, err);
+            });
+        } else if (state === 'OPENING') {
+            console.log(`🔄 Client opening for session ${session_id}`);
+            // Update status saat opening (QR code sedang diproses)
+            clients[session_id].isReady = false;
+            
+            // Emit event ke frontend
+            try {
+                const { getIO } = require('./socket');
+                const io = getIO();
+                if (io) {
+                    io.to(`session-${session_id}`).emit('session-opening', {
+                        sessionId: session_id,
+                        state: 'OPENING',
+                        timestamp: new Date().toISOString()
+                    });
+                    console.log(`📡 Session-opening event emitted for session ${session_id}`);
+                }
+            } catch (socketError) {
+                console.warn(`⚠️ Socket.IO error for opening:`, socketError.message);
+            }
+        } else if (state === 'PAIRING') {
+            console.log(`🔗 Client pairing for session ${session_id}`);
+            // Update status saat pairing (QR code sedang diproses)
+            clients[session_id].isReady = false;
+            
+            // Emit event ke frontend
+            try {
+                const { getIO } = require('./socket');
+                const io = getIO();
+                if (io) {
+                    io.to(`session-${session_id}`).emit('session-pairing', {
+                        sessionId: session_id,
+                        state: 'PAIRING',
+                        timestamp: new Date().toISOString()
+                    });
+                    console.log(`📡 Session-pairing event emitted for session ${session_id}`);
+                }
+            } catch (socketError) {
+                console.warn(`⚠️ Socket.IO error for pairing:`, socketError.message);
+            }
+        } else if (state === 'UNPAIRED') {
+            console.log(`❌ Client unpaired for session ${session_id}`);
+            clients[session_id].isReady = false;
+            
+            // Update database untuk unpaired
+            whatsappSessionQueries.updateSessionStatus(session_id, false).catch(err => {
+                console.error(`❌ Error updating status for unpaired:`, err);
+            });
+        } else if (state === 'UNLAUNCHED') {
+            console.log(`⏸️ Client unlaunched for session ${session_id}`);
+            clients[session_id].isReady = false;
+        } else {
+            console.log(`📱 Unknown state for session ${session_id}: ${state}`);
+        }
     });
 
     // Inisialisasi client
@@ -274,30 +903,107 @@ const createWhatsAppClient = async (sessionRecord) => {
 
 // Fungsi untuk menghapus sesi dan menginisialisasi ulang client
 const deleteSessionAndReInitialize = async (sessionId) => {
+    try {
+        // Destroy client terlebih dahulu
     if (clients[sessionId] && clients[sessionId].client) {
-        clients[sessionId].client.destroy();
-    }
+            try {
+                await clients[sessionId].client.destroy();
+                console.log(`✅ Client destroyed for session ${sessionId}`);
+            } catch (destroyError) {
+                console.warn(`⚠️ Error destroying client for session ${sessionId}:`, destroyError.message);
+            }
+        }
+        
+        // Simpan path direktori session sebelum menghapus client
+        const sessionDir = clients[sessionId]?.sessionDir;
     
     delete clients[sessionId];
     
-    // Hapus direktori sesi
-    const sessionDir = path.join(SESSION_DIR, `session-${sessionId}`);
-    if (fs.existsSync(sessionDir)) {
-        fs.rmSync(sessionDir, { recursive: true, force: true });
+        // Hapus direktori sesi dengan retry mechanism (jika ada)
+        if (sessionDir && fs.existsSync(sessionDir)) {
+            await removeDirectoryWithRetry(sessionDir, 3);
+        }
+        
+        // Juga coba hapus direktori session lama (tanpa timestamp)
+        const oldSessionDir = path.join(SESSION_DIR, `session-${sessionId}`);
+        if (fs.existsSync(oldSessionDir)) {
+            await removeDirectoryWithRetry(oldSessionDir, 2);
     }
     
     // Dapatkan data session dari database
-    try {
         const sessionRecord = await whatsappSessionQueries.getSessionBySessionId(sessionId);
         if (sessionRecord) {
             // Buat client baru
             return createWhatsAppClient(sessionRecord);
         }
     } catch (error) {
-        console.error(`Error saat me-reset session ${sessionId}:`, error);
+        console.error(`❌ Error saat me-reset session ${sessionId}:`, error);
+        // Tetap coba buat client baru meskipun ada error
+        try {
+            const sessionRecord = await whatsappSessionQueries.getSessionBySessionId(sessionId);
+            if (sessionRecord) {
+                return createWhatsAppClient(sessionRecord);
+            }
+        } catch (fallbackError) {
+            console.error(`❌ Fallback error saat membuat client baru:`, fallbackError);
+        }
     }
     
     return null;
+};
+
+// Fungsi helper untuk menghapus direktori dengan retry
+const removeDirectoryWithRetry = async (dirPath, maxRetries = 3) => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`🗑️ Attempt ${attempt} to remove directory: ${dirPath}`);
+            
+            // Coba hapus dengan force
+            fs.rmSync(dirPath, { recursive: true, force: true });
+            console.log(`✅ Directory removed successfully: ${dirPath}`);
+            return;
+        } catch (error) {
+            console.warn(`⚠️ Attempt ${attempt} failed to remove directory:`, error.message);
+            
+            if (attempt === maxRetries) {
+                console.error(`❌ Failed to remove directory after ${maxRetries} attempts: ${dirPath}`);
+                // Coba hapus file individual jika direktori tidak bisa dihapus
+                try {
+                    await removeDirectoryContents(dirPath);
+                    console.log(`✅ Directory contents removed: ${dirPath}`);
+                } catch (contentError) {
+                    console.error(`❌ Failed to remove directory contents:`, contentError.message);
+                }
+                return;
+            }
+            
+            // Tunggu sebentar sebelum retry
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
+    }
+};
+
+// Fungsi helper untuk menghapus isi direktori
+const removeDirectoryContents = async (dirPath) => {
+    try {
+        const files = fs.readdirSync(dirPath);
+        for (const file of files) {
+            const filePath = path.join(dirPath, file);
+            const stat = fs.statSync(filePath);
+            
+            if (stat.isDirectory()) {
+                await removeDirectoryWithRetry(filePath, 2);
+            } else {
+                try {
+                    fs.unlinkSync(filePath);
+                } catch (unlinkError) {
+                    console.warn(`⚠️ Could not remove file ${filePath}:`, unlinkError.message);
+                }
+            }
+        }
+    } catch (error) {
+        console.error(`❌ Error removing directory contents:`, error.message);
+    }
 };
 
 // Middleware untuk memeriksa jika session ada dalam permintaan
@@ -409,7 +1115,7 @@ if (config.features.enableBroadcast) {
 }
 
 // Endpoint untuk membuat session WhatsApp baru
-app.post('/api/whatsapp/session', async (req, res) => {
+app.post('/api/whatsapp/session', verifyToken, async (req, res) => {
     try {
         const userId = req.user.id;
         const { description } = req.body;
@@ -569,6 +1275,14 @@ app.get('/api/whatsapp/:sessionId/chats', async (req, res) => {
         console.log('🚀 GET /api/whatsapp/:sessionId/chats called');
         console.log('🔗 Session ID:', sessionId);
         console.log('👤 User ID:', userId);
+        console.log('🔍 Clients object keys:', Object.keys(clients));
+        console.log('🔍 Client exists for session:', !!clients[sessionId]);
+        if (clients[sessionId]) {
+            console.log('🔍 Client object keys:', Object.keys(clients[sessionId]));
+            console.log('🔍 Client ready state:', clients[sessionId].isReady);
+            console.log('🔍 Client has client property:', !!clients[sessionId].client);
+            console.log('🔍 Client has pupPage:', !!clients[sessionId].client?.pupPage);
+        }
         
         // Cek apakah session ada dan milik user
         const sessionRecord = await whatsappSessionQueries.getSessionBySessionId(sessionId);
@@ -580,7 +1294,15 @@ app.get('/api/whatsapp/:sessionId/chats', async (req, res) => {
         }
         
         // Cek apakah client ada dan siap
-        if (!clients[sessionId] || !clients[sessionId].isReady) {
+        if (!clients[sessionId]) {
+            return res.status(503).json({
+                success: false,
+                message: 'WhatsApp client tidak ditemukan. Silakan scan QR code terlebih dahulu.',
+                needScan: true
+            });
+        }
+        
+        if (!clients[sessionId].isReady) {
             return res.status(503).json({
                 success: false,
                 message: 'WhatsApp client belum siap. Silakan scan QR code terlebih dahulu.',
@@ -588,19 +1310,81 @@ app.get('/api/whatsapp/:sessionId/chats', async (req, res) => {
             });
         }
         
-        // Ambil semua chat
-        const chats = await clients[sessionId].client.getChats();
+        // Cek apakah client memiliki page yang valid
+        if (!clients[sessionId].client || !clients[sessionId].client.pupPage) {
+            return res.status(503).json({
+                success: false,
+                message: 'WhatsApp client connection error. Silakan scan QR code ulang.',
+                needScan: true
+            });
+        }
         
-        res.status(200).json({
-            success: true,
-            chats: chats.map(chat => ({
-                id: chat.id._serialized,
-                name: chat.name,
-                isGroup: chat.isGroup,
-                timestamp: chat.timestamp,
-                unreadCount: chat.unreadCount
-            }))
-        });
+        try {
+            // Ambil semua chat dengan timeout dan error handling
+            console.log('📱 Attempting to get chats from WhatsApp client...');
+            
+            const chats = await Promise.race([
+                clients[sessionId].client.getChats(),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('getChats timeout after 10 seconds')), 10000)
+                )
+            ]);
+            
+            console.log(`✅ Successfully retrieved ${chats.length} chats`);
+            
+            res.status(200).json({
+                success: true,
+                chats: chats.map(chat => {
+                    try {
+                        return {
+                            id: chat.id._serialized || chat.id.id || chat.id,
+                            name: chat.name || 'Unknown',
+                            isGroup: chat.isGroup || false,
+                            timestamp: chat.timestamp || Date.now(),
+                            unreadCount: chat.unreadCount || 0
+                        };
+                    } catch (chatError) {
+                        console.warn('⚠️ Error processing chat:', chatError.message);
+                        return {
+                            id: 'error-processing',
+                            name: 'Error Processing Chat',
+                            isGroup: false,
+                            timestamp: Date.now(),
+                            unreadCount: 0
+                        };
+                    }
+                }).filter(chat => chat.id !== 'error-processing') // Remove error chats
+            });
+            
+        } catch (getChatsError) {
+            console.error('❌ Error getting chats from WhatsApp client:', getChatsError);
+            
+            // Check if it's a connection error
+            if (getChatsError.message.includes('Session closed') || 
+                getChatsError.message.includes('Protocol error') ||
+                getChatsError.message.includes('Target closed')) {
+                
+                console.log('🔄 Client connection error detected, suggesting reconnection');
+                
+                res.status(200).json({
+                    success: true,
+                    chats: [],
+                    message: 'WhatsApp client connection error',
+                    note: 'Silakan scan QR code ulang untuk menghubungkan kembali',
+                    needReconnect: true,
+                    error: getChatsError.message
+                });
+            } else {
+                // Return empty chat list for other errors
+                res.status(200).json({
+                    success: true,
+                    chats: [],
+                    message: 'Tidak dapat mengambil chat list, tetapi session tetap aktif',
+                    note: 'Silakan coba refresh atau scan QR code ulang jika diperlukan',
+                    error: getChatsError.message
+                });
+            }
+        }
         
     } catch (error) {
         console.error('Error saat mengambil daftar chat:', error);
@@ -851,7 +1635,99 @@ app.post('/api/whatsapp/:sessionId/chats/:contactId/file', async (req, res) => {
         console.log('👤 Contact ID:', contactId);
         console.log('👤 User ID:', userId);
         console.log('📁 File Type:', fileType);
+
+        // Validasi client state sebelum mengirim file
+        console.log(`📱 Validating client state before sending file...`);
+        console.log(`📱 Client exists:`, !!clients[sessionId]);
+        console.log(`📱 Client client exists:`, !!clients[sessionId]?.client);
+        console.log(`📱 Client isReady:`, clients[sessionId]?.isReady);
+        
+        if (!clients[sessionId]?.client) {
+            return res.status(400).json({
+                success: false,
+                message: 'Client WhatsApp tidak tersedia atau belum terinisialisasi'
+            });
+        }
+
+        // Cek apakah client dalam state yang siap
+        let clientState = 'UNKNOWN';
+        try {
+            if (typeof clients[sessionId].client.getState === 'function') {
+                // getState() mungkin async, coba await dulu
+                const stateResult = await clients[sessionId].client.getState();
+                clientState = stateResult;
+                console.log(`📱 Client getState(): ${clientState}`);
+            } else if (clients[sessionId].client.state) {
+                clientState = clients[sessionId].client.state;
+                console.log(`📱 Client state: ${clientState}`);
+            }
+        } catch (err) {
+            console.log(`📱 Error getting client state:`, err.message);
+            // Fallback: coba akses state langsung
+            if (clients[sessionId].client.state) {
+                clientState = clients[sessionId].client.state;
+                console.log(`📱 Fallback client state: ${clientState}`);
+            }
+        }
+
+        if (clientState !== 'CONNECTED' && clientState !== 'OPENING') {
+            console.log(`⚠️ Client not ready for sending files. State: ${clientState}`);
+            
+            // Fallback: Jika isReady true tapi state tidak terdeteksi, coba kirim file
+            if (clients[sessionId].isReady) {
+                console.log(`🔄 Client isReady=true but state=${clientState}, trying to send file anyway...`);
+                // Lanjutkan ke pengiriman file
+            } else {
+                return res.status(400).json({
+                    success: false,
+                    message: `Client WhatsApp belum siap. Status: ${clientState}. Silakan tunggu hingga terhubung.`
+                });
+            }
+        }
+
+        // Cek apakah client memiliki method sendMessage
+        if (typeof clients[sessionId].client.sendMessage !== 'function') {
+            console.log(`⚠️ Client does not have sendMessage method`);
+            return res.status(400).json({
+                success: false,
+                message: 'Client WhatsApp tidak memiliki method sendMessage'
+            });
+        }
+
+        console.log(`✅ Client validation passed, proceeding with sendFile...`);
         console.log('📁 File Name:', fileName);
+
+        // Validasi tambahan: Cek apakah client internal benar-benar siap
+        try {
+            // Cek apakah client memiliki method getChat (indikasi internal siap)
+            if (typeof clients[sessionId].client.getChat !== 'function') {
+                console.log(`⚠️ Client internal not ready - getChat method not available for file send`);
+                console.log(`📱 Available methods:`, Object.getOwnPropertyNames(clients[sessionId].client).filter(name => typeof clients[sessionId].client[name] === 'function'));
+                
+                // Fallback: Coba kirim file langsung tanpa validasi getChat
+                console.log(`🔄 Attempting to send file without getChat validation...`);
+            } else {
+                // Coba akses chat untuk memastikan client internal siap
+                console.log(`📱 Testing client internal readiness for file send...`);
+                try {
+                    const testChat = await clients[sessionId].client.getChat(contactId);
+                    if (!testChat) {
+                        console.log(`⚠️ Cannot access chat for ${contactId}`);
+                        return res.status(503).json({
+                            success: false,
+                            message: 'Tidak dapat mengakses chat. Pastikan nomor telepon valid dan terdaftar di WhatsApp.'
+                        });
+                    }
+                    console.log(`✅ Client internal readiness confirmed for file send`);
+                } catch (getChatError) {
+                    console.log(`⚠️ getChat test failed for file send:`, getChatError.message);
+                    console.log(`🔄 Proceeding with file send anyway...`);
+                }
+            }
+        } catch (internalError) {
+            console.log(`⚠️ Client internal validation failed for file send:`, internalError.message);
+            console.log(`🔄 Proceeding with file send anyway...`);
+        }
         
         if (!fileData || !fileType) {
             return res.status(400).json({
@@ -938,21 +1814,49 @@ app.post('/api/whatsapp/:sessionId/chats/:contactId/file', async (req, res) => {
                         reject(new Error('Send file timeout after 30 seconds'));
                     }, 30000);
                     
-                    // Try to send the file
-                    let sendPromise;
-                    if (fileType.startsWith('image/')) {
-                        // Send as image
-                        const media = MessageMedia.fromFilePath(tempFilePath);
-                        sendPromise = clients[sessionId].client.sendMessage(contactId, media, {
-                            caption: message || ''
-                        });
-                    } else {
-                        // Send as document
-                        const media = MessageMedia.fromFilePath(tempFilePath);
-                        sendPromise = clients[sessionId].client.sendMessage(contactId, media, {
-                            caption: message || ''
-                        });
-                    }
+                    // Try to send the file with retry mechanism
+                    const sendFileWithRetry = async () => {
+                        let retryCount = 0;
+                        const maxRetries = 3;
+                        
+                        while (retryCount < maxRetries) {
+                            try {
+                                console.log(`📤 Attempting to send file (attempt ${retryCount + 1}/${maxRetries})...`);
+                                
+                                let sendPromise;
+                                if (fileType.startsWith('image/')) {
+                                    // Send as image
+                                    const media = MessageMedia.fromFilePath(tempFilePath);
+                                    sendPromise = clients[sessionId].client.sendMessage(contactId, media, {
+                                        caption: message || ''
+                                    });
+                                } else {
+                                    // Send as document
+                                    const media = MessageMedia.fromFilePath(tempFilePath);
+                                    sendPromise = clients[sessionId].client.sendMessage(contactId, media, {
+                                        caption: message || ''
+                                    });
+                                }
+                                
+                                const result = await sendPromise;
+                                console.log(`✅ File sent successfully on attempt ${retryCount + 1}`);
+                                return result;
+                            } catch (error) {
+                                retryCount++;
+                                console.log(`❌ Send file attempt ${retryCount} failed:`, error.message);
+                                
+                                if (retryCount >= maxRetries) {
+                                    throw error;
+                                }
+                                
+                                // Wait before retry
+                                console.log(`⏳ Waiting 2 seconds before retry...`);
+                                await new Promise(resolve => setTimeout(resolve, 2000));
+                            }
+                        }
+                    };
+                    
+                    const sendPromise = sendFileWithRetry();
                     
                     sendPromise
                         .then(result => {
@@ -1144,7 +2048,7 @@ app.get('/api/whatsapp/:sessionId/contacts', async (req, res) => {
 });
 
 // Endpoint untuk mendapatkan daftar session user
-app.get('/api/whatsapp/sessions', async (req, res) => {
+app.get('/api/whatsapp/sessions', verifyToken, async (req, res) => {
     try {
         console.log('🚀 GET /api/whatsapp/sessions called');
         console.log('🔗 Full URL:', req.originalUrl);
@@ -1170,15 +2074,163 @@ app.get('/api/whatsapp/sessions', async (req, res) => {
         // Tambahkan status koneksi dari client yang sedang aktif
         const enhancedSessions = sessions.map(session => {
             const client = clients[session.session_id];
+            
+            console.log(`📊 Session ${session.session_id} client status:`, {
+                exists: !!client,
+                isReady: client?.isReady,
+                phoneNumber: client?.phoneNumber,
+                qrCode: client?.qrCode ? 'exists' : 'null',
+                clientState: client?.client?.state,
+                lastActivity: client?.lastActivity
+            });
+            
             return {
                 ...session,
                 isConnected: client ? client.isReady : false,
                 hasQrCode: client ? client.qrCode !== null : false,
-                lastSeen: client ? client.createdAt : session.updated_at
+                lastSeen: client ? client.createdAt : session.updated_at,
+                phoneNumber: client ? client.phoneNumber : null,
+                clientState: client?.client?.state || 'UNKNOWN'
             };
         });
         
         console.log('✅ Enhanced sessions:', enhancedSessions);
+        
+        // Debug: Periksa status client secara real-time
+        console.log('🔍 Real-time client status check:');
+        Object.keys(clients).forEach(sessionId => {
+            const client = clients[sessionId];
+            // Fallback: Jika clientState undefined, coba ambil dari client
+            let clientState = client?.client?.state;
+            if (!clientState && client?.client) {
+                console.log(`⚠️ ClientState undefined for ${sessionId}, trying to get from client...`);
+                clientState = client.client.state || 'UNKNOWN';
+                console.log(`📱 ClientState from fallback: ${clientState}`);
+            } else if (!clientState) {
+                clientState = 'UNKNOWN';
+                console.log(`⚠️ No client.client object for ${sessionId}, setting clientState to UNKNOWN`);
+            }
+
+            console.log(`📱 Client ${sessionId}:`, {
+                exists: !!client,
+                isReady: client?.isReady,
+                phoneNumber: client?.phoneNumber,
+                qrCode: client?.qrCode ? 'exists' : 'null',
+                clientState: clientState,
+                lastActivity: client?.lastActivity
+            });
+            
+            // Fallback: Jika client ada tapi isReady false, cek state client
+            if (client && !client.isReady) {
+                console.log(`⚠️ Client ${sessionId} exists but isReady=false, checking fallback...`);
+                console.log(`📱 Client type:`, typeof client);
+                console.log(`📱 Client keys:`, Object.keys(client || {}));
+                
+                if (client.client) {
+                    const actualState = client.client.state;
+                    console.log(`📱 Client state: ${actualState}`);
+                    
+                    // Jika state CONNECTED atau OPENING, update isReady
+                    if (actualState === 'CONNECTED' || actualState === 'OPENING') {
+                        console.log(`🔄 Force updating isReady for client ${sessionId} based on state ${actualState}`);
+                        client.isReady = true;
+                        client.lastActivity = new Date().toISOString();
+                        client.phoneNumber = client.client.info?.wid || null;
+                        client.qrCode = null;
+                        
+                        // Update database
+                        whatsappSessionQueries.updateSessionStatus(sessionId, true).catch(err => {
+                            console.error(`❌ Error force updating status for ${sessionId}:`, err);
+                        });
+                    }
+                } else {
+                    console.log(`⚠️ No client.client object for ${sessionId}, checking direct client methods...`);
+                    
+                    // Fallback: Coba akses method client langsung
+                    if (typeof client.getState === 'function') {
+                        try {
+                            const state = client.getState();
+                            console.log(`📱 Client getState(): ${state}`);
+                            
+                            if (state === 'CONNECTED' || state === 'OPENING') {
+                                console.log(`🔄 Force updating isReady for client ${sessionId} based on getState() ${state}`);
+                                client.isReady = true;
+                                client.lastActivity = new Date().toISOString();
+                                
+                                // Coba ambil phone number dari getInfo
+                                if (typeof client.getInfo === 'function') {
+                                    try {
+                                        const info = client.getInfo();
+                                        console.log(`📱 Client getInfo():`, info);
+                                        client.phoneNumber = info?.wid || null;
+                                    } catch (err) {
+                                        console.log(`📱 Error calling getInfo():`, err.message);
+                                        client.phoneNumber = 'Unknown';
+                                    }
+                                } else {
+                                    client.phoneNumber = 'Unknown';
+                                }
+                                
+                                client.qrCode = null;
+                                
+                                // Update database
+                                whatsappSessionQueries.updateSessionStatus(sessionId, true).catch(err => {
+                                    console.error(`❌ Error force updating status for ${sessionId}:`, err);
+                                });
+                            }
+                        } catch (err) {
+                            console.log(`📱 Error calling getState():`, err.message);
+                        }
+                    }
+                    
+                    // Fallback: Cek apakah client memiliki method sendMessage (indikasi siap)
+                    if (!client.isReady && typeof client.sendMessage === 'function') {
+                        console.log(`📱 Client has sendMessage method, but waiting for proper connection...`);
+                        // JANGAN set isReady=true di sini, biarkan event handler yang menangani
+                    }
+                }
+            }
+            
+            // Fallback: Jika isReady true tapi phoneNumber null, coba ambil dari client (BenyFilho fork)
+            if (client && client.isReady && !client.phoneNumber) {
+                console.log(`⚠️ Client ${sessionId} isReady=true but phoneNumber=null, trying to get from client (BenyFilho fork)...`);
+                
+                if (client.client && client.client.info && client.client.info.wid) {
+                    console.log(`📱 Found phone number in client.info.wid: ${client.client.info.wid}`);
+                    client.phoneNumber = client.client.info.wid;
+                    console.log(`✅ Phone number updated: ${client.phoneNumber}`);
+                } else {
+                    console.log(`⚠️ No phone number found in client.info`);
+                    
+                    // Fallback: Coba ambil dari client state atau info lainnya
+                    if (client.client) {
+                        console.log(`📱 Client object exists, checking for phone number...`);
+                        console.log(`📱 Client state: ${client.client.state}`);
+                        console.log(`📱 Client info:`, client.client.info);
+                        console.log(`📱 Client info me:`, client.client.info?.me);
+                        console.log(`📱 Client info pushname:`, client.client.info?.pushname);
+                        
+                        // Coba ambil dari berbagai sumber (BenyFilho fork)
+                        const phoneNumber = client.client.info?.wid || 
+                                         client.client.info?.me?.id || 
+                                         client.client.info?.me?.wid ||
+                                         client.client.info?.wid?.split('@')[0] ||
+                                         client.client.info?.pushname ||
+                                         null;
+                        
+                        if (phoneNumber) {
+                            console.log(`📱 Found phone number from fallback: ${phoneNumber}`);
+                            client.phoneNumber = phoneNumber;
+                            console.log(`✅ Phone number updated from fallback: ${client.phoneNumber}`);
+                        } else {
+                            console.log(`⚠️ No phone number found in any fallback source`);
+                        }
+                    } else {
+                        console.log(`⚠️ No client.client object available for fallback`);
+                    }
+                }
+            }
+        });
         
         res.status(200).json({ 
             success: true, 
@@ -1241,24 +2293,53 @@ app.get('/api/whatsapp/sessions', async (req, res) => {
 //     }
 // });
 
+// Middleware untuk debugging semua request ke /api/whatsapp/session
+app.use('/api/whatsapp/session', (req, res, next) => {
+    console.log('🔍 Middleware caught request to /api/whatsapp/session');
+    console.log('🔗 Full URL:', req.originalUrl);
+    console.log('🔗 Method:', req.method);
+    console.log('🔗 Params:', req.params);
+    console.log('🔗 Query:', req.query);
+    next();
+});
+
 // Endpoint untuk mendapatkan detail session
-app.get('/api/whatsapp/session/:sessionId', async (req, res) => {
+app.get('/api/whatsapp/session/:sessionId', verifyToken, async (req, res) => {
     try {
         const { sessionId } = req.params;
         const userId = req.user.id;
         
         console.log('🚀 GET /api/whatsapp/session/:sessionId called');
+        console.log('🔗 Full URL:', req.originalUrl);
+        console.log('🔗 Method:', req.method);
         console.log('🔗 Session ID:', sessionId);
         console.log('👤 User ID:', userId);
+        console.log('🔑 Headers:', req.headers);
         
         // Cek apakah session ada dan milik user
+        console.log('🔍 Checking session in database...');
         const sessionRecord = await whatsappSessionQueries.getSessionBySessionId(sessionId);
-        if (!sessionRecord || sessionRecord.user_id !== userId) {
+        console.log('🔍 Session record from database:', sessionRecord);
+        
+        if (!sessionRecord) {
+            console.log('❌ Session not found in database');
             return res.status(404).json({
                 success: false,
-                message: 'Session tidak ditemukan atau tidak memiliki akses'
+                message: 'Session tidak ditemukan'
             });
         }
+        
+        if (sessionRecord.user_id !== userId) {
+            console.log('❌ Session does not belong to user');
+            console.log('🔍 Session user_id:', sessionRecord.user_id);
+            console.log('🔍 Request user_id:', userId);
+            return res.status(403).json({
+                success: false,
+                message: 'Tidak memiliki akses ke session ini'
+            });
+        }
+        
+        console.log('✅ Session found and belongs to user');
         
         // Cek apakah client ada dan siap
         const clientStatus = clients[sessionId] ? {
@@ -1318,6 +2399,7 @@ app.get('/api/whatsapp/session/:sessionId/qrcode', verifyToken, async (req, res)
     try {
         const { sessionId } = req.params;
         const userId = req.user.id;
+        const { forceRefresh } = req.query; // Parameter untuk force refresh
         
         // Verifikasi bahwa session milik user ini
         const session = await whatsappSessionQueries.getSessionBySessionId(sessionId);
@@ -1328,8 +2410,56 @@ app.get('/api/whatsapp/session/:sessionId/qrcode', verifyToken, async (req, res)
             });
         }
         
-        // Reset session untuk mendapatkan QR code baru
+        // Cek apakah client sudah ada dan siap
+        if (clients[sessionId] && clients[sessionId].isReady) {
+            console.log(`📱 Client untuk session ${sessionId} sudah ready, tidak perlu QR code`);
+            return res.status(200).json({ 
+                success: true, 
+                message: 'WhatsApp sudah terhubung, tidak perlu QR code',
+                isConnected: true,
+                phoneNumber: clients[sessionId].phoneNumber
+            });
+        }
+        
+        // Cek apakah QR code sudah ada dan masih valid (tidak expired)
+        if (clients[sessionId] && clients[sessionId].qrCode && !forceRefresh) {
+            const qrAge = Date.now() - clients[sessionId].qrTimestamp;
+            const maxAge = config.whatsapp.qrTimeout;
+            
+            if (qrAge < maxAge) {
+                console.log(`📱 QR Code untuk session ${sessionId} masih valid (age: ${Math.floor(qrAge/1000)}s), tidak perlu generate ulang`);
+                return res.status(200).json({ 
+                    success: true, 
+                    message: 'QR Code siap untuk di-scan',
+                    qrCode: clients[sessionId].qrCode,
+                    expiresIn: Math.max(0, Math.floor((maxAge - qrAge) / 1000)),
+                    qrAge: Math.floor(qrAge / 1000),
+                    isReused: true
+                });
+            } else {
+                console.log(`📱 QR Code untuk session ${sessionId} expired (age: ${Math.floor(qrAge/1000)}s), akan generate ulang`);
+            }
+        }
+        
+        // Hanya reset session jika force refresh atau tidak ada client
+        if (forceRefresh === 'true' || !clients[sessionId]) {
+            console.log(`🔄 Force refresh QR code untuk session ${sessionId}`);
+            try {
         await deleteSessionAndReInitialize(sessionId);
+            } catch (resetError) {
+                console.error(`❌ Error resetting session ${sessionId}:`, resetError.message);
+                // Coba buat client baru langsung jika reset gagal
+                try {
+                    const sessionRecord = await whatsappSessionQueries.getSessionBySessionId(sessionId);
+                    if (sessionRecord) {
+                        await createWhatsAppClient(sessionRecord);
+                        console.log(`✅ Created new client after reset failure for session ${sessionId}`);
+                    }
+                } catch (fallbackError) {
+                    console.error(`❌ Fallback client creation failed:`, fallbackError.message);
+                }
+            }
+        }
         
         // Tunggu QR code dengan timeout yang dapat dikonfigurasi
         const maxWaitTime = config.whatsapp.qrTimeout;
@@ -1343,7 +2473,8 @@ app.get('/api/whatsapp/session/:sessionId/qrcode', verifyToken, async (req, res)
                     success: true, 
                     message: 'QR Code siap untuk di-scan',
                     qrCode: clients[sessionId].qrCode,
-                    expiresIn: config.whatsapp.qrTimeout / 1000
+                    expiresIn: config.whatsapp.qrTimeout / 1000,
+                    qrAge: 0
                 });
             }
             
@@ -1381,14 +2512,18 @@ app.get('/api/whatsapp/session/:sessionId/qrcode', verifyToken, async (req, res)
 });
 
 // Endpoint untuk memeriksa status koneksi
-app.get('/api/whatsapp/session/:sessionId/status', async (req, res) => {
+app.get('/api/whatsapp/session/:sessionId/status', verifyToken, async (req, res) => {
     try {
         const { sessionId } = req.params;
         const userId = req.user.id;
+        const { forceCheck } = req.query;
+        
+        console.log('🔍 Status check for session:', sessionId, 'user:', userId, 'forceCheck:', forceCheck);
         
         // Verifikasi bahwa session milik user ini
         const session = await whatsappSessionQueries.getSessionBySessionId(sessionId);
         if (!session || session.user_id !== userId) {
+            console.log('❌ Session not found or access denied');
             return res.status(403).json({ 
                 success: false, 
                 message: 'Tidak memiliki akses ke session ini'
@@ -1396,18 +2531,277 @@ app.get('/api/whatsapp/session/:sessionId/status', async (req, res) => {
         }
         
         const client = clients[sessionId];
-        const isConnected = client ? client.isReady : false;
+        let isConnected = client ? client.isReady : false;
+        let hasQrCode = client ? client.qrCode !== null : false;
+        
+        console.log('📊 Initial client status:', {
+            exists: !!client,
+            isReady: client?.isReady,
+            phoneNumber: client?.phoneNumber,
+            qrCode: client?.qrCode ? 'exists' : 'null',
+            clientState: client?.client?.state,
+            hasClient: !!client?.client,
+            clientInfo: client?.client ? {
+                state: client.client.state,
+                info: client.client.info,
+                isReady: client.client.isReady
+            } : 'No client object'
+        });
+        
+        // Jika sudah terhubung, pastikan tidak ada QR code
+        if (isConnected && client) {
+            hasQrCode = false;
+            client.qrCode = null; // Clear QR code jika sudah terhubung
+            console.log('📱 Session sudah terhubung, clearing QR code');
+        }
+        
+        // Force check jika diminta
+        if (forceCheck === 'true' && client) {
+            try {
+                console.log('🔄 Force checking client state...');
+                console.log('📱 Client object exists:', !!client);
+                console.log('📱 Client.client exists:', !!client.client);
+                
+                if (client.client) {
+                    const state = client.client.state;
+                    console.log('📱 Client state:', state);
+                    
+                    // Update status berdasarkan state actual
+                    if (state === 'CONNECTED' || state === 'OPENING') {
+                        isConnected = true;
+                        clients[sessionId].isReady = true;
+                        clients[sessionId].lastActivity = new Date().toISOString();
+                        clients[sessionId].phoneNumber = client.client.info?.wid || null;
+                        clients[sessionId].qrCode = null;
+                        
+                        // Update database
+                        await whatsappSessionQueries.updateSessionStatus(sessionId, true);
+                        console.log('✅ Status updated based on force check');
+                    } else {
+                        isConnected = false;
+                        clients[sessionId].isReady = false;
+                    }
+                } else {
+                    console.log('⚠️ No client.client object, using isReady status');
+                    // Jika tidak ada client.client, gunakan status isReady yang sudah ada
+                    isConnected = client.isReady || false;
+                }
+            } catch (stateError) {
+                console.warn('⚠️ Error checking client state:', stateError.message);
+                // Fallback ke status isReady yang sudah ada
+                isConnected = client.isReady || false;
+            }
+        }
+        
+        // Fallback: Jika client ada tapi isReady false, cek state client
+        if (client && !isConnected) {
+            console.log(`⚠️ Client ${sessionId} exists but isReady=false, checking fallback...`);
+            console.log(`📱 Client type:`, typeof client);
+            console.log(`📱 Client keys:`, Object.keys(client || {}));
+            
+            if (client.client) {
+                const actualState = client.client.state;
+                console.log(`📱 Client state: ${actualState}`);
+                
+                // Jika state CONNECTED atau OPENING, update isReady
+                if (actualState === 'CONNECTED' || actualState === 'OPENING') {
+                    console.log(`🔄 Force updating isReady for client ${sessionId} based on state ${actualState}`);
+                    isConnected = true;
+                    clients[sessionId].isReady = true;
+                    clients[sessionId].lastActivity = new Date().toISOString();
+                    clients[sessionId].phoneNumber = client.client.info?.wid || null;
+                    clients[sessionId].qrCode = null;
+                    
+                    // Update database
+                    try {
+                        await whatsappSessionQueries.updateSessionStatus(sessionId, true);
+                        console.log('✅ Status force updated based on client state');
+                    } catch (err) {
+                        console.error(`❌ Error force updating status for ${sessionId}:`, err);
+                    }
+                }
+            } else {
+                console.log(`⚠️ No client.client object for ${sessionId}, checking direct client methods...`);
+                
+                // Fallback: Coba akses method client langsung
+                if (typeof client.getState === 'function') {
+                    try {
+                        const state = client.getState();
+                        console.log(`📱 Client getState(): ${state}`);
+                        
+                        if (state === 'CONNECTED' || state === 'OPENING') {
+                            console.log(`🔄 Force updating isReady for client ${sessionId} based on getState() ${state}`);
+                            isConnected = true;
+                            clients[sessionId].isReady = true;
+                            clients[sessionId].lastActivity = new Date().toISOString();
+                            
+                            // Coba ambil phone number dari getInfo
+                            if (typeof client.getInfo === 'function') {
+                                try {
+                                    const info = client.getInfo();
+                                    console.log(`📱 Client getInfo():`, info);
+                                    clients[sessionId].phoneNumber = info?.wid || null;
+                                } catch (err) {
+                                    console.log(`📱 Error calling getInfo():`, err.message);
+                                    clients[sessionId].phoneNumber = 'Unknown';
+                                }
+                            } else {
+                                clients[sessionId].phoneNumber = 'Unknown';
+                            }
+                            
+                            clients[sessionId].qrCode = null;
+                            
+                            // Update database
+                            try {
+                                await whatsappSessionQueries.updateSessionStatus(sessionId, true);
+                                console.log('✅ Status force updated based on getState()');
+                            } catch (err) {
+                                console.error(`❌ Error force updating status for ${sessionId}:`, err);
+                            }
+                        }
+                    } catch (err) {
+                        console.log(`📱 Error calling getState():`, err.message);
+                    }
+                }
+                
+                // Fallback: Cek apakah client memiliki method sendMessage (indikasi siap)
+                if (!isConnected && typeof client.sendMessage === 'function') {
+                    console.log(`📱 Client has sendMessage method, but waiting for proper connection...`);
+                    // JANGAN set isConnected=true di sini, biarkan event handler yang menangani
+                }
+                
+                // Jika tidak ada method yang tersedia, gunakan status isReady yang sudah ada
+                if (!isConnected) {
+                    isConnected = client.isReady || false;
+                    console.log(`⚠️ No available methods, using existing isReady status: ${isConnected}`);
+                }
+            }
+        }
+        
+        // Fallback: Jika client sudah CONNECTED tapi isReady masih false, force update
+        let actualClientState = client.client?.state;
+        if (client && client.client && typeof client.client.getState === 'function') {
+            try {
+                const stateResult = await client.client.getState();
+                if (stateResult) {
+                    actualClientState = stateResult;
+                    console.log(`📱 Status endpoint getState() result: ${actualClientState}`);
+                }
+            } catch (err) {
+                console.log(`📱 Status endpoint getState() error:`, err.message);
+            }
+        }
+        
+        if (client && client.client && actualClientState === 'CONNECTED' && !isConnected) {
+            console.log(`🔄 Client ${sessionId} is CONNECTED but isReady=false, force updating...`);
+            isConnected = true;
+            clients[sessionId].isReady = true;
+            clients[sessionId].lastActivity = new Date().toISOString();
+            
+            if (client.client.info && client.client.info.wid) {
+                clients[sessionId].phoneNumber = client.client.info.wid;
+            } else if (client.client.info && client.client.info.me) {
+                clients[sessionId].phoneNumber = client.client.info.me;
+            } else {
+                clients[sessionId].phoneNumber = 'Unknown';
+            }
+            
+            clients[sessionId].qrCode = null;
+            
+            // Update database
+            try {
+                await whatsappSessionQueries.updateSessionStatus(sessionId, true);
+                console.log('✅ Status force updated based on CONNECTED state');
+            } catch (err) {
+                console.error(`❌ Error force updating status for ${sessionId}:`, err);
+            }
+        }
+        
+        // Fallback: Jika isReady true tapi phoneNumber null, coba ambil dari client (BenyFilho fork)
+        if (client && isConnected && !client.phoneNumber) {
+            console.log(`⚠️ Client ${sessionId} isReady=true but phoneNumber=null, trying to get from client (BenyFilho fork)...`);
+            
+            if (client.client && client.client.info && client.client.info.wid) {
+                console.log(`📱 Found phone number in client.info.wid: ${client.client.info.wid}`);
+                clients[sessionId].phoneNumber = client.client.info.wid;
+                console.log(`✅ Phone number updated: ${clients[sessionId].phoneNumber}`);
+            } else {
+                console.log(`⚠️ No phone number found in client.info`);
+                
+                // Fallback: Coba ambil dari client state atau info lainnya
+                if (client.client) {
+                    console.log(`📱 Client object exists, checking for phone number...`);
+                    console.log(`📱 Client state: ${client.client.state}`);
+                    console.log(`📱 Client info:`, client.client.info);
+                    console.log(`📱 Client info me:`, client.client.info?.me);
+                    console.log(`📱 Client info pushname:`, client.client.info?.pushname);
+                    
+                    // Coba ambil dari berbagai sumber (BenyFilho fork)
+                    const phoneNumber = client.client.info?.wid || 
+                                     client.client.info?.me?.id || 
+                                     client.client.info?.me?.wid ||
+                                     client.client.info?.wid?.split('@')[0] ||
+                                     client.client.info?.pushname ||
+                                     null;
+                    
+                    if (phoneNumber) {
+                        console.log(`📱 Found phone number from fallback: ${phoneNumber}`);
+                        clients[sessionId].phoneNumber = phoneNumber;
+                        console.log(`✅ Phone number updated from fallback: ${clients[sessionId].phoneNumber}`);
+                    } else {
+                        console.log(`⚠️ No phone number found in any fallback source`);
+                    }
+                } else {
+                    console.log(`⚠️ No client.client object available for fallback`);
+                }
+            }
+        }
+        
+        // Fallback: Jika clientState undefined, coba ambil dari client
+        let clientState = client?.client?.state;
+        if (!clientState && client?.client) {
+            console.log(`⚠️ ClientState undefined, trying to get from client...`);
+            clientState = client.client.state || 'UNKNOWN';
+            console.log(`📱 ClientState from fallback: ${clientState}`);
+        } else if (!clientState) {
+            clientState = 'UNKNOWN';
+            console.log(`⚠️ No client.client object, setting clientState to UNKNOWN`);
+        }
+
+        console.log('📊 Final client status:', {
+            exists: !!client,
+            isReady: isConnected,
+            hasQrCode: hasQrCode,
+            qrTimestamp: client ? client.qrTimestamp : null,
+            phoneNumber: client ? client.phoneNumber : null,
+            clientState: clientState,
+            willUpdateDatabase: isConnected && client?.isReady !== isConnected
+        });
+        
+        // Log database update status
+        if (isConnected && client?.isReady !== isConnected) {
+            console.log('🔄 Status changed, will update database...');
+            try {
+                await whatsappSessionQueries.updateSessionStatus(sessionId, true);
+                console.log('✅ Database updated successfully');
+            } catch (dbError) {
+                console.error('❌ Error updating database:', dbError);
+            }
+        } else {
+            console.log('📊 No database update needed - status unchanged');
+        }
         
         res.status(200).json({ 
             success: true, 
             sessionId: sessionId,
             isConnected: isConnected,
-            hasQrCode: client ? client.qrCode !== null : false,
+            hasQrCode: hasQrCode,
+            phoneNumber: client ? client.phoneNumber : null,
             retryCount: client ? client.retryCount : 0,
             lastActivity: client ? client.createdAt : session.updated_at
         });
     } catch (error) {
-        console.error('Error saat memeriksa status koneksi:', error);
+        console.error('❌ Error saat memeriksa status koneksi:', error);
         res.status(500).json({ 
             success: false, 
             message: 'Gagal memeriksa status koneksi', 
@@ -1417,7 +2811,7 @@ app.get('/api/whatsapp/session/:sessionId/status', async (req, res) => {
 });
 
 // Endpoint untuk memperbarui deskripsi session
-app.put('/api/whatsapp/session/:sessionId', async (req, res) => {
+app.put('/api/whatsapp/session/:sessionId', verifyToken, async (req, res) => {
     try {
         const { sessionId } = req.params;
         const userId = req.user.id;
@@ -1456,7 +2850,7 @@ app.put('/api/whatsapp/session/:sessionId', async (req, res) => {
 });
 
 // Endpoint untuk logout dan menghapus session
-app.delete('/api/whatsapp/session/:sessionId', async (req, res) => {
+app.delete('/api/whatsapp/session/:sessionId', verifyToken, async (req, res) => {
     try {
         const { sessionId } = req.params;
         const userId = req.user.id;
@@ -1507,7 +2901,7 @@ app.delete('/api/whatsapp/session/:sessionId', async (req, res) => {
 });
 
 // Endpoint untuk mengirim pesan WhatsApp
-app.post('/api/whatsapp/session/:sessionId/send', async (req, res) => {
+app.post('/api/whatsapp/session/:sessionId/send', verifyToken, async (req, res) => {
     try {
         const { sessionId } = req.params;
         const userId = req.user.id;
@@ -1555,13 +2949,158 @@ app.post('/api/whatsapp/session/:sessionId/send', async (req, res) => {
             formattedNumber = `${formattedNumber}@c.us`;
         }
 
-        // Kirim pesan dengan error handling yang robust
+        // Validasi client state sebelum mengirim pesan
+        console.log(`📱 Validating client state before sending message...`);
+        console.log(`📱 Client exists:`, !!clients[sessionId]);
+        console.log(`📱 Client client exists:`, !!clients[sessionId]?.client);
+        console.log(`📱 Client isReady:`, clients[sessionId]?.isReady);
+        
+        if (!clients[sessionId]?.client) {
+            return res.status(400).json({
+                success: false,
+                message: 'Client WhatsApp tidak tersedia atau belum terinisialisasi'
+            });
+        }
+
+        // Cek apakah client dalam state yang siap
+        let clientState = 'UNKNOWN';
+        try {
+            if (typeof clients[sessionId].client.getState === 'function') {
+                // getState() mungkin async, coba await dulu
+                const stateResult = await clients[sessionId].client.getState();
+                clientState = stateResult;
+                console.log(`📱 Client getState(): ${clientState}`);
+            } else if (clients[sessionId].client.state) {
+                clientState = clients[sessionId].client.state;
+                console.log(`📱 Client state: ${clientState}`);
+            }
+        } catch (err) {
+            console.log(`📱 Error getting client state:`, err.message);
+            // Fallback: coba akses state langsung
+            if (clients[sessionId].client.state) {
+                clientState = clients[sessionId].client.state;
+                console.log(`📱 Fallback client state: ${clientState}`);
+            }
+        }
+
+        if (clientState !== 'CONNECTED' && clientState !== 'OPENING') {
+            console.log(`⚠️ Client not ready for sending messages. State: ${clientState}`);
+            
+            // Fallback: Jika isReady true tapi state tidak terdeteksi, coba kirim pesan
+            if (clients[sessionId].isReady) {
+                console.log(`🔄 Client isReady=true but state=${clientState}, trying to send message anyway...`);
+                // Lanjutkan ke pengiriman pesan
+            } else {
+                return res.status(400).json({
+                    success: false,
+                    message: `Client WhatsApp belum siap. Status: ${clientState}. Silakan tunggu hingga terhubung.`
+                });
+            }
+        }
+
+        // Cek apakah client memiliki method sendMessage
+        if (typeof clients[sessionId].client.sendMessage !== 'function') {
+            console.log(`⚠️ Client does not have sendMessage method`);
+            return res.status(400).json({
+                success: false,
+                message: 'Client WhatsApp tidak memiliki method sendMessage'
+            });
+        }
+
+        console.log(`✅ Client validation passed, proceeding with sendMessage...`);
+
+        // Validasi tambahan: Cek apakah client internal benar-benar siap
+        try {
+            // Cek apakah client memiliki method getChat (indikasi internal siap)
+            if (typeof clients[sessionId].client.getChat !== 'function') {
+                console.log(`⚠️ Client internal not ready - getChat method not available`);
+                console.log(`📱 Available methods:`, Object.getOwnPropertyNames(clients[sessionId].client).filter(name => typeof clients[sessionId].client[name] === 'function'));
+                
+                // Fallback: Coba kirim pesan langsung tanpa validasi getChat
+                console.log(`🔄 Attempting to send message without getChat validation...`);
+            } else {
+                // Coba akses chat untuk memastikan client internal siap
+                console.log(`📱 Testing client internal readiness...`);
+                try {
+                    const testChat = await clients[sessionId].client.getChat(formattedNumber);
+                    if (!testChat) {
+                        console.log(`⚠️ Cannot access chat for ${formattedNumber}`);
+                        return res.status(503).json({
+                            success: false,
+                            message: 'Tidak dapat mengakses chat. Pastikan nomor telepon valid dan terdaftar di WhatsApp.'
+                        });
+                    }
+                    console.log(`✅ Client internal readiness confirmed`);
+                } catch (getChatError) {
+                    console.log(`⚠️ getChat test failed:`, getChatError.message);
+                    console.log(`🔄 Proceeding with sendMessage anyway...`);
+                }
+            }
+        } catch (internalError) {
+            console.log(`⚠️ Client internal validation failed:`, internalError.message);
+            console.log(`🔄 Proceeding with sendMessage anyway...`);
+        }
+
+        // Kirim pesan dengan error handling yang robust dan retry mechanism
         let sendResult;
         let messageId = null;
         let timestamp = Date.now();
+        let retryCount = 0;
+        const maxRetries = 3;
+
+        const sendMessageWithRetry = async () => {
+            while (retryCount < maxRetries) {
+                try {
+                    console.log(`📤 Attempting to send message (attempt ${retryCount + 1}/${maxRetries})...`);
+                    
+                    // Cek apakah client internal benar-benar siap
+                    if (!clients[sessionId].client.pupPage) {
+                        console.log(`⚠️ Client page not ready, waiting...`);
+                        await new Promise(resolve => setTimeout(resolve, 3000));
+                        retryCount++;
+                        continue;
+                    }
+                    
+                    // Coba kirim pesan dengan timeout
+                    const sendPromise = clients[sessionId].client.sendMessage(formattedNumber, message);
+                    const timeoutPromise = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Send message timeout')), 15000)
+                    );
+                    
+                    sendResult = await Promise.race([sendPromise, timeoutPromise]);
+                    console.log(`✅ Message sent successfully on attempt ${retryCount + 1}`);
+                    return sendResult;
+                } catch (error) {
+                    retryCount++;
+                    console.log(`❌ Send message attempt ${retryCount} failed:`, error.message);
+                    
+                    // Jika error getChat, coba restart client
+                    if (error.message.includes('getChat') || error.message.includes('evaluate')) {
+                        console.log(`🔄 getChat error detected, attempting client restart...`);
+                        try {
+                            await clients[sessionId].client.destroy();
+                            await new Promise(resolve => setTimeout(resolve, 5000));
+                            // Recreate client
+                            await createWhatsAppClient(sessionId);
+                            console.log(`✅ Client restarted successfully`);
+                        } catch (restartError) {
+                            console.log(`❌ Failed to restart client:`, restartError.message);
+                        }
+                    }
+                    
+                    if (retryCount >= maxRetries) {
+                        throw error;
+                    }
+                    
+                    // Wait before retry
+                    console.log(`⏳ Waiting 3 seconds before retry...`);
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                }
+            }
+        };
 
         try {
-            sendResult = await clients[sessionId].client.sendMessage(formattedNumber, message);
+            sendResult = await sendMessageWithRetry();
             
             // Robust message ID extraction
             try {
