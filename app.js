@@ -452,8 +452,8 @@ const createWhatsAppClient = async (sessionRecord) => {
             }
         
             // Update client data - tidak ada skip untuk memastikan update
-            clients[session_id].isReady = true;
-            clients[session_id].qrCode = null;
+        clients[session_id].isReady = true;
+        clients[session_id].qrCode = null;
             clients[session_id].lastActivity = new Date().toISOString();
             clients[session_id].phoneNumber = client.info?.wid || null;
         
@@ -1823,20 +1823,20 @@ app.post('/api/whatsapp/:sessionId/chats/:contactId/file', async (req, res) => {
                             try {
                                 console.log(`📤 Attempting to send file (attempt ${retryCount + 1}/${maxRetries})...`);
                                 
-                                let sendPromise;
-                                if (fileType.startsWith('image/')) {
-                                    // Send as image
-                                    const media = MessageMedia.fromFilePath(tempFilePath);
-                                    sendPromise = clients[sessionId].client.sendMessage(contactId, media, {
-                                        caption: message || ''
-                                    });
-                                } else {
-                                    // Send as document
-                                    const media = MessageMedia.fromFilePath(tempFilePath);
-                                    sendPromise = clients[sessionId].client.sendMessage(contactId, media, {
-                                        caption: message || ''
-                                    });
-                                }
+                    let sendPromise;
+                    if (fileType.startsWith('image/')) {
+                        // Send as image
+                        const media = MessageMedia.fromFilePath(tempFilePath);
+                        sendPromise = clients[sessionId].client.sendMessage(contactId, media, {
+                            caption: message || ''
+                        });
+                    } else {
+                        // Send as document
+                        const media = MessageMedia.fromFilePath(tempFilePath);
+                        sendPromise = clients[sessionId].client.sendMessage(contactId, media, {
+                            caption: message || ''
+                        });
+                    }
                                 
                                 const result = await sendPromise;
                                 console.log(`✅ File sent successfully on attempt ${retryCount + 1}`);
