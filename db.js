@@ -381,6 +381,41 @@ const whatsappSessionQueries = {
         return result.rows[0];
     },
 
+    // Memperbarui QR code dan status koneksi
+    updateSessionConnection: async (sessionId, qrCode, isConnected, phoneNumber = null) => {
+        const query = `
+            UPDATE whatsapp_sessions 
+            SET 
+                session_data = COALESCE(session_data, '{}')::jsonb || $1::jsonb,
+                is_active = $2,
+                updated_at = NOW() 
+            WHERE session_id = $3
+            RETURNING *
+        `;
+        const sessionData = {
+            qrCode: qrCode,
+            isConnected: isConnected,
+            phoneNumber: phoneNumber,
+            lastConnectionUpdate: new Date().toISOString()
+        };
+        const result = await pool.query(query, [JSON.stringify(sessionData), isConnected, sessionId]);
+        return result.rows[0];
+    },
+
+    // Mendapatkan session dengan data koneksi
+    getSessionWithConnection: async (sessionId) => {
+        const query = `
+            SELECT *, 
+                   COALESCE(session_data->>'qrCode', '') as qr_code,
+                   COALESCE((session_data->>'isConnected')::boolean, false) as is_connected,
+                   COALESCE(session_data->>'phoneNumber', '') as phone_number
+            FROM whatsapp_sessions 
+            WHERE session_id = $1
+        `;
+        const result = await pool.query(query, [sessionId]);
+        return result.rows[0];
+    },
+
     // Memperbarui deskripsi session WhatsApp
     updateSessionDescription: async (sessionId, description) => {
         const query = `

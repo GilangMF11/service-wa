@@ -88,9 +88,8 @@ if (!fs.existsSync(BROADCAST_UPLOAD_DIR)) {
 const createWhatsAppClient = async (sessionRecord) => {
     const { session_id, user_id, description } = sessionRecord;
     
-    // Gunakan timestamp untuk membuat direktori session yang unik
-    const timestamp = Date.now();
-    const sessionDir = path.join(SESSION_DIR, `session-${session_id}-${timestamp}`);
+    // Gunakan session_id saja untuk direktori session (lebih stabil)
+    const sessionDir = path.join(SESSION_DIR, `session-${session_id}`);
     
     // Pastikan direktori session ada
     if (!fs.existsSync(sessionDir)) {
@@ -100,7 +99,7 @@ const createWhatsAppClient = async (sessionRecord) => {
     // Buat client baru dengan konfigurasi yang lebih robust untuk mengatasi ready callback issue
     const client = new Client({
         authStrategy: new LocalAuth({ 
-            clientId: `session-${session_id}-${timestamp}`,
+            clientId: `session-${session_id}`,
             dataPath: sessionDir
         }),
         puppeteer: {
@@ -377,21 +376,10 @@ const createWhatsAppClient = async (sessionRecord) => {
         }
     }, 5000); // Poll setiap 5 detik
 
-    // Cleanup direktori session lama (jika ada)
-    setTimeout(async () => {
-        try {
-            const oldSessionDir = path.join(SESSION_DIR, `session-${session_id}`);
-            if (fs.existsSync(oldSessionDir)) {
-                console.log(`🧹 Cleaning up old session directory: ${oldSessionDir}`);
-                await removeDirectoryWithRetry(oldSessionDir, 2);
-            }
-        } catch (cleanupError) {
-            console.warn(`⚠️ Error cleaning up old session directory:`, cleanupError.message);
-        }
-    }, 5000); // Cleanup setelah 5 detik
+    // Tidak perlu cleanup directory karena menggunakan path yang sama
 
     // Event saat QR code tersedia untuk di-scan
-    client.on('qr', async (qr) => {
+    client.on('qr', (qr) => {
         // Cek apakah client sudah authenticated/ready - jika ya, jangan generate QR lagi
         if (clients[session_id].isReady || client.state === 'CONNECTED') {
             console.log(`📱 Client untuk session ${session_id} sudah ready/connected, tidak perlu QR code lagi`);
@@ -411,6 +399,15 @@ const createWhatsAppClient = async (sessionRecord) => {
         clients[session_id].qrCode = qr;
         clients[session_id].qrTimestamp = Date.now(); // Catat waktu QR code dibuat
         console.log(`📱 QR Code saved for session ${session_id}`);
+        
+        // Simpan QR code ke database (non-blocking)
+        whatsappSessionQueries.updateSessionConnection(session_id, qr, false)
+            .then(() => {
+                console.log(`💾 QR Code saved to database for session ${session_id}`);
+            })
+            .catch(dbError => {
+                console.error(`❌ Error saving QR code to database:`, dbError);
+            });
     });
 
     // Event saat client siap - dengan fallback mechanism untuk fork BenyFilho
@@ -591,6 +588,14 @@ const createWhatsAppClient = async (sessionRecord) => {
         clients[session_id].phoneNumber = client.info?.wid || null;
         clients[session_id].qrCode = null; // Clear QR code saat authenticated
         
+        // Simpan status koneksi ke database
+        try {
+            await whatsappSessionQueries.updateSessionConnection(session_id, null, true, clients[session_id].phoneNumber);
+            console.log(`💾 Connection status saved to database for session ${session_id}`);
+        } catch (dbError) {
+            console.error(`❌ Error saving connection status to database:`, dbError);
+        }
+        
         console.log(`📊 AUTHENTICATED EVENT - Updated client data for session ${session_id}:`, {
             isReady: clients[session_id].isReady,
             phoneNumber: clients[session_id].phoneNumber,
@@ -635,7 +640,6 @@ const createWhatsAppClient = async (sessionRecord) => {
             clients[session_id].lastActivity = new Date().toISOString();
             clients[session_id].phoneNumber = client.info?.wid || null;
             console.log(`📱 Session saved - updated client data for session ${session_id}`);
-            
             // Update database
             whatsappSessionQueries.updateSessionStatus(session_id, true).catch(err => {
                 console.error(`❌ Error updating status for session saved:`, err);
@@ -653,7 +657,7 @@ const createWhatsAppClient = async (sessionRecord) => {
     });
 
     // Event untuk mendeteksi perubahan status
-    client.on('change_state', (state) => {
+    client.on('change_state', async (state) => {
         console.log(`📱 State change for session ${session_id}: ${state}`);
         console.log(`📱 Client info:`, {
             isReady: clients[session_id]?.isReady,
@@ -679,6 +683,14 @@ const createWhatsAppClient = async (sessionRecord) => {
             clients[session_id].lastActivity = new Date().toISOString();
             clients[session_id].phoneNumber = client.info?.wid || null;
             clients[session_id].qrCode = null; // Clear QR code saat terhubung
+            
+            // Simpan status koneksi ke database
+            try {
+                await whatsappSessionQueries.updateSessionConnection(session_id, null, true, clients[session_id].phoneNumber);
+                console.log(`💾 Connection status saved to database for session ${session_id}`);
+            } catch (dbError) {
+                console.error(`❌ Error saving connection status to database:`, dbError);
+            }
             
             console.log(`📊 CHANGE_STATE CONNECTED - Updated client data for session ${session_id}:`, {
                 isReady: clients[session_id].isReady,
@@ -915,20 +927,15 @@ const deleteSessionAndReInitialize = async (sessionId) => {
         }
         
         // Simpan path direktori session sebelum menghapus client
-        const sessionDir = clients[sessionId]?.sessionDir;
+        const oldSessionDir = clients[sessionId]?.sessionDir;
     
-    delete clients[sessionId];
-    
-        // Hapus direktori sesi dengan retry mechanism (jika ada)
-        if (sessionDir && fs.existsSync(sessionDir)) {
+        delete clients[sessionId];
+        
+        // Hapus direktori session
+        const sessionDir = path.join(SESSION_DIR, `session-${sessionId}`);
+        if (fs.existsSync(sessionDir)) {
             await removeDirectoryWithRetry(sessionDir, 3);
         }
-        
-        // Juga coba hapus direktori session lama (tanpa timestamp)
-        const oldSessionDir = path.join(SESSION_DIR, `session-${sessionId}`);
-        if (fs.existsSync(oldSessionDir)) {
-            await removeDirectoryWithRetry(oldSessionDir, 2);
-    }
     
     // Dapatkan data session dari database
         const sessionRecord = await whatsappSessionQueries.getSessionBySessionId(sessionId);
@@ -2438,6 +2445,38 @@ app.get('/api/whatsapp/session/:sessionId/qrcode', verifyToken, async (req, res)
                 });
             } else {
                 console.log(`📱 QR Code untuk session ${sessionId} expired (age: ${Math.floor(qrAge/1000)}s), akan generate ulang`);
+            }
+        } else if (!clients[sessionId] && !forceRefresh) {
+            // Coba muat QR code dari database jika tidak ada di memory
+            try {
+                const sessionWithConnection = await whatsappSessionQueries.getSessionWithConnection(sessionId);
+                if (sessionWithConnection && sessionWithConnection.qr_code && !sessionWithConnection.is_connected) {
+                    console.log(`📱 Found saved QR code in database for session ${sessionId}`);
+                    
+                    // Simpan ke memory untuk akses cepat
+                    if (!clients[sessionId]) {
+                        clients[sessionId] = {
+                            qrCode: sessionWithConnection.qr_code,
+                            qrTimestamp: Date.now(),
+                            isReady: false,
+                            phoneNumber: null,
+                            createdAt: new Date(),
+                            lastActivity: new Date()
+                        };
+                    }
+                    
+                    return res.status(200).json({ 
+                        success: true, 
+                        message: 'QR Code siap untuk di-scan (from database)',
+                        qrCode: sessionWithConnection.qr_code,
+                        expiresIn: config.whatsapp.qrTimeout / 1000,
+                        qrAge: 0,
+                        isReused: true,
+                        fromDatabase: true
+                    });
+                }
+            } catch (dbError) {
+                console.error(`❌ Error loading QR code from database:`, dbError);
             }
         }
         

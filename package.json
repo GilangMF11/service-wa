@@ -8,6 +8,10 @@
         "dev": "nodemon app.js",
         "migrate": "node scripts/migrate.js",
         "migrate:dev": "NODE_ENV=development SEED_DATABASE=true node scripts/migrate.js",
+        "cleanup-sessions": "node scripts/cleanup-sessions.js",
+        "fix-qr-connection": "node scripts/fix-qr-connection.js",
+        "migrate-sessions": "node scripts/migrate-sessions.js migrate",
+        "restore-sessions": "node scripts/migrate-sessions.js restore",
         "test": "echo \"Error: no test specified\" && exit 1",
         "install-broadcast": "npm install multer csv-parser && mkdir -p uploads/broadcast temp middleware"
     },

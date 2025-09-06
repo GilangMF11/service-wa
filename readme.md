@@ -1,462 +1,93 @@
-# WhatsApp API dengan Multi-User Session & Broadcast System
+# WhatsApp Service
 
-🚀 **API lengkap untuk mengirim pesan WhatsApp dengan dukungan multi-user session dan sistem broadcast yang canggih menggunakan Express.js dan whatsapp-web.js.**
 
-## 📋 Daftar Isi
 
-- [Fitur Utama](#-fitur-utama)
-- [Prasyarat](#-prasyarat)
-- [Instalasi](#-instalasi)
-- [Konfigurasi](#-konfigurasi)
-- [Menjalankan Server](#-menjalankan-server)
-- [Autentikasi & Multi-User](#-autentikasi--multi-user)
-- [API Endpoints](#-api-endpoints)
-  - [Manajemen Session](#manajemen-session)
-  - [Pengiriman Pesan](#pengiriman-pesan)
-  - [Sistem Broadcast](#sistem-broadcast)
-- [Contoh Penggunaan](#-contoh-penggunaan)
-- [Error Handling](#-error-handling)
-- [Keamanan](#-keamanan)
-- [Troubleshooting](#-troubleshooting)
-- [Kontribusi](#-kontribusi)
-- [Lisensi](#-lisensi)
+## Getting started
 
-## 🌟 Fitur Utama
+To make it easy for you to get started with GitLab, here's a list of recommended next steps.
 
-### Core Features
-- ✅ **Multi-User Session**: Dukungan multiple WhatsApp account sekaligus
-- ✅ **QR Code Authentication**: Login mudah dengan scan QR code
-- ✅ **Real-time Status**: Monitor status koneksi secara real-time
-- ✅ **Message Sending**: Kirim pesan text ke nomor individual
+Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
 
-### Advanced Broadcast System
-- 📋 **Broadcast Lists Management**: Kelola daftar kontak broadcast
-- 👥 **Contact Management**: Import/export kontak via CSV
-- 📢 **Campaign Management**: Kelola kampanye broadcast dengan fitur lengkap
-- 📅 **Scheduled Broadcasts**: Jadwalkan broadcast untuk waktu tertentu
-- 📊 **Analytics & Reporting**: Laporan detail performa kampanye
-- 📁 **Media Upload**: Upload dan kelola file media
-- 📝 **Message Templates**: Sistem template pesan
-- 🔄 **Real-time Processing**: Proses broadcast dengan kontrol pause/resume
+## Add your files
 
-## 🔧 Prasyarat
+- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
+- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
 
-- **Node.js** (versi 14 atau lebih tinggi)
-- **npm** atau **yarn**
-- **Akun WhatsApp** aktif
-- **Database** (sesuai konfigurasi)
-
-## 📦 Instalasi
-
-1. **Clone repository**
-```bash
-git clone <repository-url>
-cd whatsapp-api
+```
+cd existing_repo
+git remote add origin https://gitlab.com/GilangMF11/whatsapp-service.git
+git branch -M main
+git push -uf origin main
 ```
 
-2. **Install dependencies**
-```bash
-npm install
-# atau
-yarn install
-```
-
-3. **Setup environment variables**
-```bash
-cp .env.example .env
-```
-
-## ⚙️ Konfigurasi
-
-Edit file `.env` dengan konfigurasi yang sesuai:
-
-```env
-PORT=3000
-NODE_ENV=development
-
-# Database Configuration
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=whatsapp_api
-DB_USER=your_username
-DB_PASS=your_password
-
-# Session Configuration
-SESSION_SECRET=your_session_secret
-
-# Upload Configuration
-UPLOAD_PATH=./uploads
-MAX_FILE_SIZE=10485760
-
-# Rate Limiting
-RATE_LIMIT_WINDOW=900000
-RATE_LIMIT_MAX=100
-```
-
-## 🚀 Menjalankan Server
-
-### Development Mode
-```bash
-npm run dev
-# atau
-yarn dev
-```
-
-### Production Mode
-```bash
-npm start
-# atau
-yarn start
-```
-
-Server akan berjalan di `http://localhost:3000`
-
-## 🔐 Autentikasi & Multi-User
-
-### Header Wajib
-Untuk semua request (kecuali `/clients`), sertakan header:
-
-```http
-user-id: your-unique-user-id
-Content-Type: application/json
-```
-
-### Multi-User Session
-- Setiap user diidentifikasi dengan `user-id` unik
-- Sesi WhatsApp disimpan terpisah di direktori `sessions/{user-id}`
-- Mendukung multiple WhatsApp account secara bersamaan
-
-## 📡 API Endpoints
-
-### Base URL
-```
-http://localhost:3000/api/whatsapp
-```
-
-### Manajemen Session
-
-#### Mendapatkan QR Code
-```http
-GET /:sessionId/qrcode
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "QR Code siap untuk di-scan",
-  "qrCode": "data:image/png;base64,..."
-}
-```
-
-#### Memeriksa Status Koneksi
-```http
-GET /:sessionId/status
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "connected": true,
-  "user": {
-    "name": "Your Name",
-    "number": "628123456789"
-  }
-}
-```
-
-#### Logout dan Hapus Sesi
-```http
-POST /:sessionId/logout
-```
-
-#### Daftar Client Aktif
-```http
-GET /clients
-```
-
-### Pengiriman Pesan
-
-#### Kirim Pesan Text
-```http
-POST /:sessionId/send-message
-```
-
-**Body:**
-```json
-{
-  "number": "628123456789",
-  "message": "Halo, ini adalah pesan dari API!"
-}
-```
-
-### Sistem Broadcast
-
-#### 📋 Manajemen Broadcast Lists
-
-| Method | Endpoint | Deskripsi |
-|--------|----------|-----------|
-| GET | `/:sessionId/broadcast/lists` | Get semua broadcast lists |
-| POST | `/:sessionId/broadcast/lists` | Buat broadcast list baru |
-| GET | `/:sessionId/broadcast/lists/:listId` | Detail broadcast list |
-| PUT | `/:sessionId/broadcast/lists/:listId` | Update broadcast list |
-| DELETE | `/:sessionId/broadcast/lists/:listId` | Hapus broadcast list |
-
-#### 👥 Manajemen Kontak
-
-| Method | Endpoint | Deskripsi |
-|--------|----------|-----------|
-| GET | `/:sessionId/broadcast/lists/:listId/contacts` | Get kontak dengan pagination |
-| POST | `/:sessionId/broadcast/lists/:listId/contacts` | Tambah kontak manual |
-| POST | `/:sessionId/broadcast/lists/:listId/contacts/bulk` | Import kontak dari CSV |
-| PUT | `/:sessionId/broadcast/lists/:listId/contacts/:number` | Update kontak |
-| DELETE | `/:sessionId/broadcast/lists/:listId/contacts/:number` | Hapus satu kontak |
-
-#### 📢 Manajemen Kampanye
-
-| Method | Endpoint | Deskripsi |
-|--------|----------|-----------|
-| GET | `/:sessionId/broadcast/campaigns` | Get semua kampanye |
-| POST | `/:sessionId/broadcast/send` | Kirim broadcast sekarang |
-| POST | `/:sessionId/broadcast/schedule` | Jadwalkan broadcast |
-| GET | `/:sessionId/broadcast/campaigns/:campaignId` | Detail & statistik kampanye |
-| POST | `/:sessionId/broadcast/campaigns/:campaignId/pause` | Pause kampanye |
-| POST | `/:sessionId/broadcast/campaigns/:campaignId/resume` | Resume kampanye |
-| POST | `/:sessionId/broadcast/campaigns/:campaignId/stop` | Stop kampanye |
-
-#### 📁 Media & File Management
-
-| Method | Endpoint | Deskripsi |
-|--------|----------|-----------|
-| POST | `/:sessionId/broadcast/upload` | Upload file media |
-| DELETE | `/:sessionId/broadcast/upload/:filename` | Hapus file |
-
-#### 📊 Analytics & Reporting
-
-| Method | Endpoint | Deskripsi |
-|--------|----------|-----------|
-| GET | `/:sessionId/broadcast/stats` | Statistik overview |
-| GET | `/:sessionId/broadcast/export/contacts/:listId` | Export kontak ke CSV |
-| GET | `/:sessionId/broadcast/export/campaign/:campaignId` | Export laporan kampanye |
-
-## 💡 Contoh Penggunaan
-
-### 1. Setup Session Baru
-
-```javascript
-// 1. Dapatkan QR Code
-const qrResponse = await fetch('/api/whatsapp/user123/qrcode', {
-  headers: { 'user-id': 'user123' }
-});
-
-// 2. Scan QR Code dengan WhatsApp
-
-// 3. Cek status koneksi
-const statusResponse = await fetch('/api/whatsapp/user123/status', {
-  headers: { 'user-id': 'user123' }
-});
-```
-
-### 2. Kirim Pesan Sederhana
-
-```javascript
-const response = await fetch('/api/whatsapp/user123/send-message', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'user-id': 'user123'
-  },
-  body: JSON.stringify({
-    number: '628123456789',
-    message: 'Halo dari WhatsApp API!'
-  })
-});
-```
-
-### 3. Broadcast Workflow
-
-```javascript
-// 1. Buat broadcast list
-const listResponse = await fetch('/api/whatsapp/user123/broadcast/lists', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'user-id': 'user123'
-  },
-  body: JSON.stringify({
-    name: 'Customer List',
-    description: 'Daftar pelanggan aktif'
-  })
-});
-
-const listId = listResponse.data.id;
-
-// 2. Upload kontak via CSV
-const formData = new FormData();
-formData.append('file', csvFile);
-
-await fetch(`/api/whatsapp/user123/broadcast/lists/${listId}/contacts/bulk`, {
-  method: 'POST',
-  headers: { 'user-id': 'user123' },
-  body: formData
-});
-
-// 3. Kirim broadcast
-await fetch('/api/whatsapp/user123/broadcast/send', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'user-id': 'user123'
-  },
-  body: JSON.stringify({
-    listId: listId,
-    message: 'Selamat! Anda mendapat promo spesial!',
-    delayBetweenMessages: 2000
-  })
-});
-```
-
-### 4. Format CSV untuk Import Kontak
-
-```csv
-name,number,email,custom_field1
-John Doe,628123456789,john@example.com,VIP
-Jane Smith,628987654321,jane@example.com,Regular
-```
-
-## ⚠️ Error Handling
-
-### Format Response Error
-```json
-{
-  "success": false,
-  "error": "Error message",
-  "code": "ERROR_CODE",
-  "details": {
-    "field": "validation details"
-  }
-}
-```
-
-### Common Error Codes
-- `SESSION_NOT_FOUND`: Session tidak ditemukan
-- `NOT_CONNECTED`: WhatsApp tidak terhubung
-- `INVALID_NUMBER`: Format nomor tidak valid
-- `RATE_LIMITED`: Terlalu banyak request
-- `FILE_TOO_LARGE`: File terlalu besar
-- `BROADCAST_IN_PROGRESS`: Broadcast sedang berjalan
-
-## 🔒 Keamanan
-
-### Rate Limiting
-- **General API**: 100 requests per 15 menit
-- **Broadcast**: 10 campaigns per jam
-- **Upload**: 5 files per menit
-
-### Validasi File Upload
-- **Allowed Types**: jpg, jpeg, png, gif, pdf, doc, docx
-- **Max Size**: 10MB per file
-- **Virus Scanning**: Otomatis untuk file upload
-
-### Security Headers
-```javascript
-// Pastikan menggunakan HTTPS di production
-app.use(helmet());
-app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000']
-}));
-```
-
-## 🚨 Troubleshooting
-
-### Session Tidak Terhubung
-1. Hapus folder session: `rm -rf sessions/{user-id}`
-2. Restart server
-3. Scan QR code ulang
-
-### QR Code Tidak Muncul
-- Pastikan WhatsApp Web tidak login di browser lain
-- Cek log server untuk error
-- Pastikan port tidak diblokir firewall
-
-### Broadcast Lambat
-- Sesuaikan `delayBetweenMessages` (minimal 1000ms)
-- Monitor penggunaan CPU dan memory
-- Gunakan database yang dioptimasi
-
-### File Upload Gagal
-- Cek disk space tersedia
-- Pastikan folder `uploads` memiliki permission write
-- Validasi format dan ukuran file
-
-## 🔧 Dependencies
-
-```json
-{
-  "express": "^4.18.0",
-  "whatsapp-web.js": "^1.21.0",
-  "multer": "^1.4.5",
-  "csv-parser": "^3.0.0",
-  "helmet": "^6.0.0",
-  "cors": "^2.8.5",
-  "dotenv": "^16.0.0",
-  "node-cron": "^3.0.0"
-}
-```
-
-## 📈 Performance Tips
-
-1. **Database Optimization**
-   - Gunakan indexing untuk query yang sering digunakan
-   - Implement connection pooling
-
-2. **Memory Management**
-   - Monitor penggunaan memory untuk session yang banyak
-   - Implement session cleanup otomatis
-
-3. **File Management**
-   - Setup automatic cleanup untuk file lama
-   - Gunakan CDN untuk file static
-
-## 🤝 Kontribusi
-
-1. Fork repository ini
-2. Buat branch feature (`git checkout -b feature/amazing-feature`)
-3. Commit perubahan (`git commit -m 'Add amazing feature'`)
-4. Push ke branch (`git push origin feature/amazing-feature`)
-5. Buat Pull Request
-
-## 📝 Changelog
-
-### v2.0.0 (Latest)
-- ✅ Complete broadcast system
-- ✅ Multi-user session support
-- ✅ Advanced analytics
-- ✅ File upload management
-- ✅ Scheduled broadcasts
-
-### v1.0.0
-- ✅ Basic WhatsApp integration
-- ✅ Simple message sending
-- ✅ QR code authentication
-
-## 📄 Lisensi
-
-MIT License - lihat file [LICENSE](LICENSE) untuk detail.
-
-## 📞 Support
-
-- **Email**: gmf@blockchaindev.com
-- **Documentation**: [docs.yourapi.com](https://docs.yourapi.com)
-- **Issues**: [GitHub Issues](https://github.com/your-repo/issues)
-
----
-
-<div align="center">
-
-**⭐ Jika project ini membantu, berikan star di GitHub! ⭐**
-
-Made with ❤️ by GilangMF11
-
-</div>
+## Integrate with your tools
+
+- [ ] [Set up project integrations](https://gitlab.com/GilangMF11/whatsapp-service/-/settings/integrations)
+
+## Collaborate with your team
+
+- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
+- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
+- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
+- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
+- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+
+## Test and Deploy
+
+Use the built-in continuous integration in GitLab.
+
+- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
+- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
+- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
+- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
+- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+
+***
+
+# Editing this README
+
+When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+
+## Suggestions for a good README
+
+Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+
+## Name
+Choose a self-explaining name for your project.
+
+## Description
+Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+
+## Badges
+On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+
+## Visuals
+Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+
+## Installation
+Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+
+## Usage
+Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+
+## Support
+Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+
+## Roadmap
+If you have ideas for releases in the future, it is a good idea to list them in the README.
+
+## Contributing
+State if you are open to contributions and what your requirements are for accepting them.
+
+For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+
+You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+
+## Authors and acknowledgment
+Show your appreciation to those who have contributed to the project.
+
+## License
+For open source projects, say how it is licensed.
+
+## Project status
+If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
