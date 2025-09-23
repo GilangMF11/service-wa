@@ -1,7 +1,7 @@
 const express = require('express');
 const path = require('path');
 const ejs = require('ejs');
-const { requireAuth, preventAuthAccess } = require('../middleware/authMiddleware');
+const { requireAuth, preventAuthAccess, requireAdmin } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
@@ -36,11 +36,14 @@ router.get('/broadcast', requireAuth, (req, res) => renderPage(res, 'broadcast',
 router.get('/documentation', requireAuth, (req, res) => renderPage(res, 'documentation', 'Documentation'));
 router.get('/sessions', requireAuth, (req, res) => renderPage(res, 'sessions', 'Session'));
 router.get('/sessions/detail', requireAuth, (req, res) => renderPage(res, 'sessionsDetail', 'Session Detail'));
-router.get('/users', requireAuth, (req, res) => renderPage(res, 'users', 'User'));
+router.get('/users', requireAdmin, (req, res) => renderPage(res, 'users', 'User'));
 router.get('/chats', requireAuth, (req, res) => renderPage(res, 'chats', 'Chat'));
 router.get('/chats/list', requireAuth, (req, res) => renderPage(res, 'chatsList', 'Chat List'));
 router.get('/contact', requireAuth, (req, res) => renderPage(res, 'contact', 'Contact'));
 router.get('/contact/list', requireAuth, (req, res) => renderPage(res, 'contactList', 'Contact List'));
+
+// Test page untuk melihat API response
+router.get('/test-api', (req, res) => renderPage(res, 'test-api', 'API Test'));
 
 // Fallback 404
 router.use((req, res) => {

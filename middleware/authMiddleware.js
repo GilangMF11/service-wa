@@ -85,8 +85,90 @@ const verifyToken = (req, res, next) => {
     }
 };
 
+// Middleware untuk mengecek role admin
+const requireAdmin = (req, res, next) => {
+    console.log('🔍 requireAdmin middleware called for:', req.path);
+    console.log('🔍 Request headers:', req.headers);
+    console.log('🔍 Session:', req.session);
+    
+    // Cek token dari Authorization header (untuk API calls)
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (token) {
+        try {
+            // Verifikasi token JWT
+            const jwt = require('jsonwebtoken');
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+            
+            console.log('🔍 JWT decoded:', decoded);
+            
+            // Cek role admin
+            if (decoded.role !== 'admin') {
+                console.log('❌ User is not admin, role:', decoded.role);
+                return res.status(403).json({
+                    success: false,
+                    message: 'Access denied. Admin role required.'
+                });
+            }
+            
+            console.log('✅ User is admin, allowing access');
+            // Tambahkan user info ke request
+            req.user = decoded;
+            return next();
+        } catch (error) {
+            console.error('❌ Token verification error:', error);
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid token'
+            });
+        }
+    }
+    
+    // Cek session untuk halaman web
+    if (req.session && req.session.user) {
+        console.log('🔍 Session user found:', req.session.user);
+        if (req.session.user.role !== 'admin') {
+            console.log('❌ Session user is not admin, role:', req.session.user.role);
+            // Untuk halaman web, render halaman 403
+            return res.status(403).render('pages/403');
+        }
+        console.log('✅ Session user is admin, allowing access');
+        return next();
+    }
+    
+    // Untuk halaman web, cek apakah ada token di query parameter (fallback)
+    const tokenFromQuery = req.query.token;
+    if (tokenFromQuery) {
+        try {
+            const jwt = require('jsonwebtoken');
+            const decoded = jwt.verify(tokenFromQuery, process.env.JWT_SECRET || 'your-secret-key');
+            
+            if (decoded.role === 'admin') {
+                console.log('✅ Token from query is admin, allowing access');
+                req.user = decoded;
+                return next();
+            }
+        } catch (error) {
+            console.error('❌ Token from query verification error:', error);
+        }
+    }
+    
+    console.log('❌ No token or session found');
+    // Jika tidak ada token atau session
+    if (req.xhr || req.path.startsWith('/api/')) {
+        return res.status(401).json({
+            success: false,
+            message: 'Unauthorized - Please login first'
+        });
+    } else {
+        console.log('🔄 Redirecting to login page');
+        return res.redirect('/auth/login');
+    }
+};
+
 module.exports = {
     requireAuth,
     preventAuthAccess,
-    verifyToken
+    verifyToken,
+    requireAdmin
 };

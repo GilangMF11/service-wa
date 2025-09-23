@@ -240,10 +240,16 @@
     <!--! END: Theme Customizer !-->
 
     <script>
+        // Check token and redirect only if not on login page
         const token = localStorage.getItem('token');
-        if (!token) {
-          alert('Kamu harus login dulu!');
+        const currentPath = window.location.pathname;
+        
+        // Only redirect if not on login/register pages and no token
+        if (!token && !currentPath.includes('/auth/')) {
+          console.log('❌ No token found, redirecting to login');
           window.location.href = '/auth/login';
+        } else if (token) {
+          console.log('✅ Token found, user is authenticated');
         }
         
         // Global utility function for API calls
@@ -295,6 +301,114 @@
         console.log('🔍 apiCall function type:', typeof window.apiCall);
         console.log('🔍 AppConfig available:', !!window.AppConfig);
         console.log('🔍 AppConfig keys:', window.AppConfig ? Object.keys(window.AppConfig) : 'N/A');
+        
+        // Check user role and show/hide admin menu items
+        function checkUserRole() {
+            console.log('🔍 Checking user role...');
+            
+            const token = localStorage.getItem('token');
+            const userData = localStorage.getItem('user');
+            const usersMenuItem = document.getElementById('users-menu-item');
+            const currentPath = window.location.pathname;
+            
+            console.log('Token exists:', !!token);
+            console.log('User data exists:', !!userData);
+            console.log('Users menu item found:', !!usersMenuItem);
+            console.log('Current path:', currentPath);
+            
+            // Skip role checking if on auth pages
+            if (currentPath.includes('/auth/')) {
+                console.log('⏭️ Skipping role check on auth page');
+                return;
+            }
+            
+            if (!token || !userData) {
+                console.log('❌ No token or user data found');
+                if (usersMenuItem) {
+                    usersMenuItem.style.display = 'none';
+                }
+                return;
+            }
+            
+            if (!usersMenuItem) {
+                console.log('❌ Users menu item not found in DOM');
+                return;
+            }
+            
+            try {
+                // Parse user data from localStorage first
+                const user = JSON.parse(userData);
+                console.log('🔍 User data from localStorage:', user);
+                console.log('🔍 User role from localStorage:', user.role);
+                
+                // Also decode JWT token as backup
+                const parts = token.split('.');
+                if (parts.length === 3) {
+                    const payload = JSON.parse(atob(parts[1]));
+                    console.log('🔍 JWT Payload:', payload);
+                    console.log('🔍 JWT role:', payload.role);
+                }
+                
+                if (user.role === 'admin') {
+                    console.log('✅ User is admin, showing menu');
+                    usersMenuItem.style.display = 'block';
+                    usersMenuItem.style.visibility = 'visible';
+                    
+                    // Update users link to include token
+                    const usersLink = document.getElementById('users-link');
+                    if (usersLink) {
+                        usersLink.href = `/users?token=${token}`;
+                        console.log('🔗 Updated users link with token');
+                    }
+                } else {
+                    console.log('❌ User is not admin, hiding menu. Role:', user.role);
+                    usersMenuItem.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('❌ Error parsing user data:', error);
+                usersMenuItem.style.display = 'none';
+            }
+        }
+        
+        // Run multiple times to ensure it works
+        function initMenuVisibility() {
+            checkUserRole();
+            
+            // Run again after DOM is fully loaded
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', checkUserRole);
+            }
+            
+            // Run after a delay to ensure all scripts are loaded
+            setTimeout(checkUserRole, 200);
+            setTimeout(checkUserRole, 500);
+        }
+        
+        // Initialize immediately
+        initMenuVisibility();
+        
+        // Debug: Force show menu for testing (only if not on auth pages)
+        setTimeout(() => {
+            const currentPath = window.location.pathname;
+            if (!currentPath.includes('/auth/')) {
+                const usersMenuItem = document.getElementById('users-menu-item');
+                if (usersMenuItem) {
+                    console.log('🔧 DEBUG: Forcing menu to show for testing');
+                    usersMenuItem.style.display = 'block';
+                    usersMenuItem.style.visibility = 'visible';
+                    
+                    // Also update the link with token
+                    const token = localStorage.getItem('token');
+                    if (token) {
+                        const usersLink = document.getElementById('users-link');
+                        if (usersLink) {
+                            usersLink.href = `/users?token=${token}`;
+                            console.log('🔗 DEBUG: Updated users link with token');
+                        }
+                    }
+                }
+            }
+        }, 1000);
       </script>
       
 </body>

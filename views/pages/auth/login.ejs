@@ -239,15 +239,29 @@
     <!--! END: Theme Customizer !-->
 
     <script>
-        // Check if user is already logged in
+        // Check if user is already logged in - but don't auto redirect
         const token = localStorage.getItem('token');
         if (token) {
-            // Validate token before redirect
+            // Validate token but don't auto redirect
             try {
                 // Simple token validation - check if it's not empty and has valid format
                 if (token && token.length > 10) {
-                    console.log('Token found, redirecting to dashboard...');
-                    window.location.replace('/dashboard');
+                    console.log('Token found, but staying on login page as requested');
+                    // Show a message that user is already logged in
+                    const loginForm = document.getElementById('loginForm');
+                    if (loginForm) {
+                        const existingMessage = document.querySelector('.already-logged-in-message');
+                        if (!existingMessage) {
+                            const messageDiv = document.createElement('div');
+                            messageDiv.className = 'alert alert-info already-logged-in-message';
+                            messageDiv.innerHTML = `
+                                <i class="bi bi-info-circle me-2"></i>
+                                Anda sudah login. <a href="/dashboard" class="alert-link">Klik di sini untuk ke Dashboard</a> atau 
+                                <a href="#" onclick="logout()" class="alert-link">Logout</a> untuk login dengan akun lain.
+                            `;
+                            loginForm.parentNode.insertBefore(messageDiv, loginForm);
+                        }
+                    }
                 } else {
                     // Invalid token, remove it
                     localStorage.removeItem('token');
@@ -258,6 +272,13 @@
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
             }
+        }
+
+        // Logout function
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.reload();
         }
 
         // Toast function for notifications
@@ -332,16 +353,32 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    // Store token
+                    // Store token and user data
                     localStorage.setItem('token', data.token);
                     localStorage.setItem('user', JSON.stringify(data.user));
                     
-                    showToast('Login berhasil!', 'success');
+                    console.log('🔍 Login response:', data);
+                    console.log('🔍 User role from API:', data.user.role);
+                    console.log('🔍 Token stored:', data.token);
+                    console.log('🔍 User data stored:', data.user);
                     
-                    // Redirect to dashboard using replace to prevent back button issues
-                    setTimeout(() => {
-                        window.location.replace('/dashboard');
-                    }, 1000);
+                    showToast(`Login berhasil! Role: ${data.user.role}`, 'success');
+                    
+                    // Show success message with options instead of auto redirect
+                    const loginForm = document.getElementById('loginForm');
+                    if (loginForm) {
+                        const existingMessage = document.querySelector('.login-success-message');
+                        if (!existingMessage) {
+                            const messageDiv = document.createElement('div');
+                            messageDiv.className = 'alert alert-success login-success-message';
+                            messageDiv.innerHTML = `
+                                <i class="bi bi-check-circle me-2"></i>
+                                Login berhasil! <a href="/dashboard" class="alert-link">Klik di sini untuk ke Dashboard</a> atau 
+                                <a href="#" onclick="logout()" class="alert-link">Logout</a> untuk login dengan akun lain.
+                            `;
+                            loginForm.parentNode.insertBefore(messageDiv, loginForm);
+                        }
+                    }
                 } else {
                     showToast(data.message || 'Login gagal', 'error');
                 }

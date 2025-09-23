@@ -109,12 +109,19 @@ const loginUser = async (req, res) => {
             });
         }
         
-        // Buat token JWT
+        // Buat token JWT (sertakan role)
         const token = jwt.sign(
-            { id: user.id, username: user.username }, 
+            { id: user.id, username: user.username, role: user.role }, 
             JWT_SECRET, 
             { expiresIn: JWT_EXPIRES }
         );
+        
+        // Set session untuk akses halaman web (server-side)
+        try {
+            req.session.user = { id: user.id, username: user.username, role: user.role };
+        } catch (e) {
+            console.warn('Cannot set session user:', e?.message);
+        }
         
         res.status(200).json({
             success: true,
@@ -122,7 +129,8 @@ const loginUser = async (req, res) => {
             user: {
                 id: user.id,
                 username: user.username,
-                email: user.email
+                email: user.email,
+                role: user.role
             },
             token: token
         });

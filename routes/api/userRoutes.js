@@ -2,6 +2,10 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../../controllers/api/userController');
+const { requireAdmin } = require('../../middleware/authMiddleware');
+
+// Semua routes users memerlukan role admin
+router.use(requireAdmin);
 
 // GET /api/users - Ambil semua users dengan pagination dan search
 router.get('/', userController.getAllUsers);
