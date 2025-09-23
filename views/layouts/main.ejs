@@ -388,27 +388,28 @@
         initMenuVisibility();
         
         // Debug: Force show menu for testing (only if not on auth pages)
-        setTimeout(() => {
-            const currentPath = window.location.pathname;
-            if (!currentPath.includes('/auth/')) {
-                const usersMenuItem = document.getElementById('users-menu-item');
-                if (usersMenuItem) {
-                    console.log('🔧 DEBUG: Forcing menu to show for testing');
-                    usersMenuItem.style.display = 'block';
-                    usersMenuItem.style.visibility = 'visible';
-                    
-                    // Also update the link with token
-                    const token = localStorage.getItem('token');
-                    if (token) {
-                        const usersLink = document.getElementById('users-link');
-                        if (usersLink) {
-                            usersLink.href = `/users?token=${token}`;
-                            console.log('🔗 DEBUG: Updated users link with token');
-                        }
-                    }
-                }
-            }
-        }, 1000);
+        // REMOVED: This block caused Users menu to appear even for non-admins
+        // setTimeout(() => {
+        //     const currentPath = window.location.pathname;
+        //     if (!currentPath.includes('/auth/')) {
+        //         const usersMenuItem = document.getElementById('users-menu-item');
+        //         if (usersMenuItem) {
+        //             console.log('🔧 DEBUG: Forcing menu to show for testing');
+        //             usersMenuItem.style.display = 'block';
+        //             usersMenuItem.style.visibility = 'visible';
+        //             
+        //             // Also update the link with token
+        //             const token = localStorage.getItem('token');
+        //             if (token) {
+        //                 const usersLink = document.getElementById('users-link');
+        //                 if (usersLink) {
+        //                     usersLink.href = `/users?token=${token}`;
+        //                     console.log('🔗 DEBUG: Updated users link with token');
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }, 1000);
       </script>
       
 </body>
