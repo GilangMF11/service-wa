@@ -133,7 +133,10 @@ class WhatsAppService {
             
             let phoneNumber = 'Unknown';
             if (client.info) {
-                phoneNumber = client.info.wid || client.info.me || 'Unknown';
+                const wid = client.info.wid || client.info.me;
+                if (wid) {
+                    phoneNumber = typeof wid === 'string' ? wid : (wid._serialized || wid.user || 'Unknown');
+                }
             }
             this.clients[sessionId].phoneNumber = phoneNumber;
 

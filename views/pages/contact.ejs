@@ -153,7 +153,8 @@
           }
 
           const phoneStr = String(session.phoneNumber || '');
-          const phoneDisplay = session.phoneNumber && session.phoneNumber !== 'Unknown' 
+          const isValidPhone = phoneStr && phoneStr !== 'Unknown' && phoneStr !== '[object Object]';
+          const phoneDisplay = isValidPhone 
             ? `+${phoneStr.split('@')[0]}` 
             : `${session.session_id.substring(0, 8)}...`;
   
