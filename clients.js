@@ -1,9 +1,5 @@
 // clients.js
-// File khusus untuk menyediakan akses ke objek clients
+// Memberikan akses ke objek clients yang dikelola oleh WhatsAppService
+const WhatsAppService = require('./services/WhatsAppService');
 
-// Objek untuk menyimpan semua client WhatsApp
-const clients = {};
-
-
-
-module.exports = clients;
+module.exports = WhatsAppService.clients;

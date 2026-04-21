@@ -1,30 +1,30 @@
 <main class="nxl-container">
   <div class="nxl-content">
     <!-- [ page-header ] start -->
-    <div class="page-header mb-4">
+    <div class="page-header">
       <div class="page-header-left d-flex align-items-center">
         <div class="page-header-title">
-          <h4 class="fw-bold text-primary mb-1">Sessions Detail</h4>
+          <h5 class="m-b-10">Sessions Detail</h5>
         </div>
-        <nav aria-label="breadcrumb">
-          <ol class="breadcrumb ms-3 mb-0">
-            <li class="breadcrumb-item"><a href="/" class="text-decoration-none">Home</a></li>
-            <li class="breadcrumb-item"><a href="/sessions" class="text-decoration-none">Sessions</a></li>
-            <li class="breadcrumb-item active">Detail</li>
-          </ol>
-        </nav>
+        <ul class="breadcrumb">
+          <li class="breadcrumb-item"><a href="/dashboard">Home</a></li>
+          <li class="breadcrumb-item"><a href="/sessions">Sessions</a></li>
+          <li class="breadcrumb-item">Detail</li>
+        </ul>
       </div>
       <div class="page-header-right ms-auto">
-        <div class="d-flex d-md-none">
-          <a href="/sessions" class="btn btn-outline-secondary btn-sm rounded-pill">
-            <i class="bi bi-arrow-left me-2"></i>
-            <span>Back</span>
-          </a>
+        <div class="page-header-right-items">
+            <div class="d-flex d-md-none">
+                <a href="/sessions" class="page-header-right-close-toggle">
+                    <i class="feather-arrow-left me-2"></i>
+                    <span>Back</span>
+                </a>
+            </div>
         </div>
-        <div class="d-md-none d-flex align-items-center ms-3">
-          <a href="javascript:void(0)" class="page-header-right-open-toggle">
-            <i class="bi bi-list fs-4"></i>
-          </a>
+        <div class="d-md-none d-flex align-items-center">
+            <a href="javascript:void(0)" class="page-header-right-open-toggle">
+                <i class="feather-align-right fs-20"></i>
+            </a>
         </div>
       </div>
     </div>
@@ -717,91 +717,102 @@
         console.log('🔌 Socket.IO disconnected');
       });
       
-      socket.on('session-ready', function(data) {
-        console.log('📡 Received session-ready event:', data);
-        if (data.sessionId === sessionId) {
-          console.log('✅ Session ready event for current session');
-          console.log('📊 Event type:', data.event || 'ready');
-          isConnected = true;
-          window.isAuthenticating = false; // Reset authentication flag
+      socket.on('qr', function(data) {
+        console.log('📱 Received new QR code via Socket.IO');
+        // Reset authenticating flag just in case
+        window.isAuthenticating = false;
+        // Optionally update UI for QR code automatically
+      });
+
+      socket.on('authenticated', function(data) {
+        console.log('🔐 Received authenticated event via Socket.IO:', data);
+        window.isAuthenticating = true;
+        
+        document.getElementById('qrCodeContainer').innerHTML = `
+          <div class="text-info p-4">
+            <div class="spinner-border text-info" role="status"></div>
+            <h5 class="mt-3">Authentication Berhasil</h5>
+            <p class="text-muted">WhatsApp sedang dihubungkan, harap tunggu beberapa saat...</p>
+          </div>`;
+        
+        showToast('Authentication berhasil, menghubungkan...', 'info');
+      });
+
+      socket.on('ready', function(data) {
+        console.log('✅ Received ready event via Socket.IO:', data);
+        isConnected = true;
+        window.isAuthenticating = false; 
+        
+        // Update UI
+        const status = 'Terhubung';
+        const color = 'text-success';
+        const icon = 'bi-check-circle-fill text-success';
+        
+        document.getElementById('statusText').textContent = status;
+        document.getElementById('statusText').className = color + ' fw-bold';
+        document.getElementById('statusIcon').className = icon + ' me-2';
+        
+        const phoneNumber = data.phoneNumber ? ` (${data.phoneNumber})` : '';
+        
+        document.getElementById('qrCodeContainer').innerHTML = `
+          <div class="text-success p-4">
+            <i class="bi bi-check-circle-fill fs-1"></i>
+            <h5 class="mt-3">Sudah Terhubung</h5>
+            <p class="text-muted">WhatsApp berhasil terhubung${phoneNumber}</p>
+          </div>`;
+        
+        // Hentikan polling dan reset counter
+        stopStatusPolling();
+        pollingCount = 0;
+        
+        showToast('WhatsApp berhasil terhubung!', 'success');
+        console.log('🛑 Stopped polling due to ready event');
+        
+        // Force check status untuk memastikan sinkronisasi
+        setTimeout(() => {
+          console.log('🔄 Force checking status after ready event');
+          getStatus(true);
+        }, 1000);
+      });
+
+      socket.on('auth_failure', function(data) {
+        console.error('❌ Received auth_failure event via Socket.IO:', data);
+        window.isAuthenticating = false;
+        isConnected = false;
+        
+        document.getElementById('qrCodeContainer').innerHTML = `
+          <div class="text-danger p-4">
+            <i class="bi bi-x-circle-fill fs-1"></i>
+            <h5 class="mt-3">Authentication Gagal</h5>
+            <p class="text-muted">Terjadi kesalahan. Silakan coba lagi.</p>
+            <button class="btn btn-outline-primary btn-sm mt-2" onclick="refreshQrCode()">
+              <i class="bi bi-arrow-clockwise"></i> Coba Lagi
+            </button>
+          </div>`;
           
-          // Update UI
-          const status = 'Terhubung';
-          const color = 'text-success';
-          const icon = 'bi-check-circle-fill text-success';
-          
-          document.getElementById('statusText').textContent = status;
-          document.getElementById('statusText').className = color + ' fw-bold';
-          document.getElementById('statusIcon').className = icon + ' me-2';
-          
-          const phoneNumber = data.phoneNumber ? ` (${data.phoneNumber})` : '';
-          const eventType = data.event === 'authenticated' ? 'Authentication berhasil' : 'WhatsApp berhasil terhubung';
-          
-          document.getElementById('qrCodeContainer').innerHTML = `
-            <div class="text-success p-4">
-              <i class="bi bi-check-circle-fill fs-1"></i>
-              <h5 class="mt-3">Sudah Terhubung</h5>
-              <p class="text-muted">${eventType}${phoneNumber}</p>
-              <p class="text-muted small">Terhubung pada: ${new Date(data.timestamp).toLocaleString()}</p>
-            </div>`;
-          
-          // Hentikan polling dan reset counter
-          stopStatusPolling();
-          pollingCount = 0;
-          
-          const toastMessage = data.event === 'authenticated' ? 'Authentication berhasil!' : 'WhatsApp berhasil terhubung!';
-          showToast(toastMessage, 'success');
-          console.log('🛑 Stopped polling due to session-ready event');
-          
-          // Force check status untuk memastikan sinkronisasi
-          setTimeout(() => {
-            console.log('🔄 Force checking status after session-ready event');
-            getStatus(true);
-          }, 1000);
-        } else {
-          console.log('⚠️ Session ready event for different session:', data.sessionId);
-        }
+        showToast('Gagal terhubung ke WhatsApp (Auth Failure)', 'error');
       });
       
-      socket.on('error', function(error) {
-        console.error('🔌 Socket.IO error:', error);
-      });
-      
-      // Event untuk mendeteksi pairing (QR code sedang diproses)
-      socket.on('session-pairing', function(data) {
-        console.log('🔗 Received session-pairing event:', data);
-        if (data.sessionId === sessionId) {
-          console.log('🔗 Session pairing for current session');
-          window.isAuthenticating = true; // Set authentication flag
+      socket.on('disconnected', function(data) {
+        console.log('🔌 Received disconnected event via Socket.IO:', data);
+        window.isAuthenticating = false;
+        isConnected = false;
+        
+        document.getElementById('statusText').textContent = 'Terputus';
+        document.getElementById('statusText').className = 'text-danger fw-bold';
+        document.getElementById('statusIcon').className = 'bi-x-circle-fill text-danger me-2';
+        
+        document.getElementById('qrCodeContainer').innerHTML = `
+          <div class="text-warning p-4">
+            <i class="bi bi-exclamation-triangle-fill fs-1"></i>
+            <h5 class="mt-3">Koneksi Terputus</h5>
+            <p class="text-muted">WhatsApp telah terputus</p>
+            <button class="btn btn-outline-primary btn-sm mt-2" onclick="refreshQrCode()">
+              <i class="bi bi-qr-code"></i> Tautkan Ulang
+            </button>
+          </div>`;
           
-          // Update UI untuk menunjukkan proses pairing
-          document.getElementById('qrCodeContainer').innerHTML = `
-            <div class="text-info p-4">
-              <div class="spinner-border text-info" role="status"></div>
-              <h5 class="mt-3">Memproses QR Code</h5>
-              <p class="text-muted">QR code sedang diproses, harap tunggu...</p>
-            </div>`;
-          
-          showToast('QR code sedang diproses...', 'info');
-        }
-      });
-      
-      // Event untuk mendeteksi opening (WhatsApp sedang dibuka)
-      socket.on('session-opening', function(data) {
-        console.log('🔄 Received session-opening event:', data);
-        if (data.sessionId === sessionId) {
-          console.log('🔄 Session opening for current session');
-          
-          // Update UI untuk menunjukkan proses opening
-          document.getElementById('qrCodeContainer').innerHTML = `
-            <div class="text-warning p-4">
-              <div class="spinner-border text-warning" role="status"></div>
-              <h5 class="mt-3">Membuka WhatsApp</h5>
-              <p class="text-muted">WhatsApp sedang dibuka, harap tunggu...</p>
-            </div>`;
-          
-          showToast('WhatsApp sedang dibuka...', 'info');
-        }
+        showToast('Koneksi WhatsApp terputus', 'warning');
       });
     } else {
       console.warn('⚠️ Socket.IO not available');

@@ -1,108 +1,101 @@
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
+const { userQueries } = require('../db');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'whatsapp-api-secret-key';
+const JWT_EXPIRES = process.env.JWT_EXPIRES || '24h';
 
 exports.showLogin = (req, res) => {
-    res.render('pages/auth/login'); // langsung render login.ejs tanpa layout
+    res.render('pages/auth/login');
 };
 
-exports.handleLogin = (req, res) => {
-    const { username, password } = req.body;
-    
-    // Validasi input
-    if (!username || !password) {
-        return res.status(400).json({
-            success: false,
-            message: 'Username dan password diperlukan'
-        });
-    }
-    
-    // Validasi credentials (untuk demo, gunakan hardcoded)
-    let userRole = 'user'; // Default role
-    let userId = 2;
-    
-    if (username === 'admin' && password === 'admin') {
-        userRole = 'admin';
-        userId = 1;
-    } else if (username === 'user' && password === 'user') {
-        userRole = 'user';
-        userId = 2;
-    } else {
-        // Invalid credentials
-        if (req.xhr || req.headers.accept?.includes('application/json')) {
+exports.handleLogin = async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        
+        // 1. Validasi input
+        if (!username || !password) {
+            return res.status(400).json({
+                success: false,
+                message: 'Username dan password diperlukan'
+            });
+        }
+        
+        // 2. Cari user di database
+        const user = await userQueries.getUserByUsername(username);
+        if (!user) {
             return res.status(401).json({
                 success: false,
                 message: 'Username atau password salah'
             });
-        } else {
-            return res.status(401).send('Login gagal. Username atau password salah.');
         }
-    }
-    
-    // Buat token JWT
-    const token = jwt.sign(
-        { 
-            id: userId, 
-            username: username,
-            role: userRole
-        },
-        process.env.JWT_SECRET || 'your-secret-key',
-        { expiresIn: '24h' }
-    );
-    
-    // Set session
-    req.session.user = {
-        id: userId,
-        username: username,
-        role: userRole
-    };
-    
-    console.log('🔍 Login successful:', { username, role: userRole, userId });
-    
-    // Prepare response data
-    const responseData = {
-        success: true,
-        message: 'Login berhasil',
-        token: token,
-        user: {
-            id: userId,
-            username: username,
-            role: (req.session && req.session.user && req.session.user.role) ? req.session.user.role : userRole
+        
+        // 3. Verifikasi password dengan bcrypt
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+            return res.status(401).json({
+                success: false,
+                message: 'Username atau password salah'
+            });
         }
-    };
-    
-    console.log('🔍 API Response Data:', JSON.stringify(responseData, null, 2));
-    
-    // Return response berdasarkan request type
-    if (req.xhr || req.headers.accept?.includes('application/json')) {
-        // API call
-        console.log('📤 Sending JSON response for API call');
-        return res.json(responseData);
-    } else {
-        // Web page - don't auto redirect, let frontend handle it
-        console.log('📤 Sending JSON response for web page');
-        return res.json(responseData);
+        
+        // 4. Buat token JWT
+        const token = jwt.sign(
+            { 
+                id: user.id, 
+                username: user.username,
+                role: user.role
+            },
+            JWT_SECRET,
+            { expiresIn: JWT_EXPIRES }
+        );
+        
+        // 5. Set session (untuk server-side rendering support)
+        if (req.session) {
+            req.session.user = {
+                id: user.id,
+                username: user.username,
+                role: user.role
+            };
+        }
+        
+        console.log('✅ Login successful:', { username: user.username, role: user.role, userId: user.id });
+        
+        // 6. Return response
+        const responseData = {
+            success: true,
+            message: 'Login berhasil',
+            token: token,
+            user: {
+                id: user.id,
+                username: user.username,
+                role: user.role,
+                email: user.email
+            }
+        };
+        
+        res.json(responseData);
+        
+    } catch (error) {
+        console.error('❌ Error in handleLogin:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Terjadi kesalahan sistem saat login',
+            error: error.message
+        });
     }
-    
 };
 
 exports.logOut = (req, res) => {
-    // Destroy session
     if (req.session) {
         req.session.destroy((err) => {
-            if (err) {
-                console.error('Error destroying session:', err);
-            }
+            if (err) console.error('Error destroying session:', err);
         });
     }
     
-    // Return response berdasarkan request type
     if (req.xhr || req.headers.accept?.includes('application/json')) {
-        // API call
-        return res.json({
-            success: true,
-            message: 'Logout berhasil'
-        });
+        return res.json({ success: true, message: 'Logout berhasil' });
     } else {
-        // Web page
         res.redirect('/auth/login');
     }
 };
@@ -111,46 +104,10 @@ exports.showRegister = (req, res) => {
     res.render('pages/auth/register');
 };
 
-// Test endpoint untuk melihat response API
 exports.testLogin = (req, res) => {
-    const { username, password } = req.body;
-    
-    console.log('🧪 Test login called with:', { username, password });
-    
-    // Simulate login logic
-    let userRole = 'user';
-    let userId = 2;
-    
-    if (username === 'admin' && password === 'admin') {
-        userRole = 'admin';
-        userId = 1;
-    } else if (username === 'user' && password === 'user') {
-        userRole = 'user';
-        userId = 2;
-    } else {
-        return res.status(401).json({
-            success: false,
-            message: 'Invalid credentials'
-        });
-    }
-    
-    const responseData = {
-        success: true,
-        message: 'Test login successful',
-        token: 'test-token-' + Date.now(),
-        user: {
-            id: userId,
-            username: username,
-            role: userRole
-        },
-        debug: {
-            timestamp: new Date().toISOString(),
-            userRole: userRole,
-            userId: userId
-        }
-    };
-    
-    console.log('🧪 Test API Response:', JSON.stringify(responseData, null, 2));
-    
-    res.json(responseData);
+    res.status(200).json({ 
+        success: true, 
+        message: 'Endpoint test login siap',
+        note: 'Gunakan /auth/login untuk login yang sesungguhnya' 
+    });
 };

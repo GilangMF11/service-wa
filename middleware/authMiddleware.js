@@ -24,9 +24,9 @@ const requireAuth = (req, res, next) => {
             message: 'Unauthorized - Please login first'
         });
     } else {
-        // Untuk halaman web, render halaman yang memerlukan login
-        // Middleware ini akan di-handle oleh frontend JavaScript
-        return next();
+        // Untuk halaman web, paksa redirect ke login jika tidak ada session/token
+        console.log('🔄 Unauthorized browser access, redirecting to /auth/login');
+        return res.redirect('/auth/login?expired=true');
     }
 };
 
@@ -71,7 +71,7 @@ const verifyToken = (req, res, next) => {
     try {
         // Verifikasi token JWT
         const jwt = require('jsonwebtoken');
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'whatsapp-api-secret-key');
         
         // Tambahkan user info ke request
         req.user = decoded;
@@ -98,7 +98,7 @@ const requireAdmin = (req, res, next) => {
         try {
             // Verifikasi token JWT
             const jwt = require('jsonwebtoken');
-            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'whatsapp-api-secret-key');
             
             console.log('🔍 JWT decoded:', decoded);
             
@@ -129,8 +129,8 @@ const requireAdmin = (req, res, next) => {
         console.log('🔍 Session user found:', req.session.user);
         if (req.session.user.role !== 'admin') {
             console.log('❌ Session user is not admin, role:', req.session.user.role);
-            // Untuk halaman web, render halaman 403
-            return res.status(403).render('pages/403');
+            // Untuk halaman web, render halaman 403 yang baru (di views/403.ejs)
+            return res.status(403).render('403');
         }
         console.log('✅ Session user is admin, allowing access');
         return next();
@@ -162,7 +162,7 @@ const requireAdmin = (req, res, next) => {
         });
     } else {
         console.log('🔄 Redirecting to login page');
-        return res.redirect('/auth/login');
+        return res.redirect('/auth/login?expired=true');
     }
 };
 

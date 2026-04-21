@@ -10,7 +10,7 @@
     <meta name="author" content="WRAPCODERS">
     <!--! The above 6 meta tags *must* come first in the head; any other head content must come *after* these tags !-->
     <!--! BEGIN: Apps Title-->
-    <title>Masuk</title>
+    <title>403 Forbidden</title>
     <!--! END:  Apps Title-->
     <!--! BEGIN: Favicon-->
     <link rel="shortcut icon" type="image/x-icon" href="/assets/images/favicon.ico">
@@ -36,45 +36,29 @@
     <!--! ================================================================ !-->
     <!--! [Start] Main Content !-->
     <!--! ================================================================ !-->
-    <main class="auth-cover-wrapper">
-        <div class="auth-cover-content-inner">
-            <div class="auth-cover-content-wrapper">
-                <div class="auth-img">
-                    <img src="/assets/images/auth/auth-user.png" alt="" class="img-fluid">
-                </div>
-            </div>
-        </div>
-        <div class="auth-cover-sidebar-inner">
-            <div class="auth-cover-card-wrapper">
-                <div class="auth-cover-card p-sm-5">
-                    <h2 class="fs-20 fw-bolder mb-4">Login</h2>
-                    <form id="loginForm" class="w-100 mt-4 pt-2">
-                        <div class="mb-4">
-                            <input type="text" class="form-control" id="username" placeholder="Username" required>
-                        </div>
-                        <div class="mb-3">
-                            <input type="password" class="form-control" id="password" placeholder="Password" required>
-                        </div>
-                        <div class="d-flex align-items-center justify-content-between">
-                            <div>
-                                <div class="custom-control custom-checkbox">
-                                    <input type="checkbox" class="custom-control-input" id="rememberMe">
-                                    <label class="custom-control-label c-pointer" for="rememberMe">Remember Me</label>
+    <main class="auth-creative-wrapper">
+        <div class="auth-creative-inner">
+            <div class="creative-card-wrapper">
+                <div class="card my-4 overflow-hidden" style="z-index: 1">
+                    <div class="row flex-1 g-0">
+                        <div class="col-lg-6 h-100 my-auto">
+                            <div class="wd-50 bg-white p-2 rounded-circle shadow-lg position-absolute translate-middle top-50 start-50">
+                                <img src="/assets/images/logo-abbr.png" alt="" class="img-fluid">
+                            </div>
+                            <div class="creative-card-body card-body p-sm-5">
+                                <h2 class="fw-bolder mb-4" style="font-size: 120px">4<span class="text-danger">0</span>3</h2>
+                                <h4 class="fw-bold mb-2">Access Forbidden</h4>
+                                <p class="fs-12 fw-medium text-muted">Sorry, you do not have permission to access this page. Please log in with an authorized account or contact your administrator.</p>
+                                <div class="mt-5">
+                                    <a href="/dashboard" class="btn btn-light-brand w-100">Back HTML Dashboard</a>
                                 </div>
                             </div>
-                            <!--
-                            <div>
-                                <a href="auth-reset-cover.html" class="fs-11 text-primary">Forget password?</a>
-                            </div> -->
                         </div>
-                        <div class="mt-5">
-                            <button type="submit" class="btn btn-lg btn-primary w-100">Login</button>
+                        <div class="col-lg-6 bg-primary">
+                            <div class="h-100 d-flex align-items-center justify-content-center">
+                                <img src="/assets/images/auth/auth-user.png" alt="" class="img-fluid">
+                            </div>
                         </div>
-                    </form>
-                    
-                    <div class="mt-5 text-muted">
-                        <span> Don't have an account?</span>
-                        <a href="auth-register-cover.html" class="fw-bold">Create an Account</a>
                     </div>
                 </div>
             </div>
@@ -237,140 +221,6 @@
     <!--! BEGIN: Theme Customizer  !-->
     <script src="/assets/js/theme-customizer-init.min.js"></script>
     <!--! END: Theme Customizer !-->
-
-    <script>
-        // Check if user is already logged in - but don't auto redirect
-        const token = localStorage.getItem('token');
-        const urlParams = new URLSearchParams(window.location.search);
-        const isLogout = urlParams.get('logout') === 'true';
-        const isExpired = urlParams.get('expired') === 'true';
-
-        if (isLogout || isExpired) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            console.log('Token cleared due to logout or expiration/unauthorized access');
-            // Remove parameter from URL to clean it up
-            window.history.replaceState({}, document.title, window.location.pathname);
-        } else if (token) {
-            // Validate token but don't auto redirect
-            try {
-                // Simple token validation - check if it's not empty and has valid format
-                if (token && token.length > 10) {
-                    console.log('Token found, redirecting to dashboard');
-                    window.location.href = '/dashboard';
-                } else {
-                    // Invalid token, remove it
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user');
-                }
-            } catch (error) {
-                console.error('Error validating token:', error);
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
-            }
-        }
-
-        // Logout function
-        function logout() {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.reload();
-        }
-
-        // Toast function for notifications
-        function showToast(message, type = 'info') {
-            let toastContainer = document.querySelector('.toast-container');
-            if (!toastContainer) {
-                toastContainer = document.createElement('div');
-                toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
-                document.body.appendChild(toastContainer);
-            }
-            
-            let bgColor = 'bg-primary';
-            let icon = 'bi-info-circle-fill';
-            
-            if (type === 'success') {
-                bgColor = 'bg-success';
-                icon = 'bi-check-circle-fill';
-            } else if (type === 'warning') {
-                bgColor = 'bg-warning text-dark';
-                icon = 'bi-exclamation-triangle-fill';
-            } else if (type === 'error') {
-                bgColor = 'bg-danger';
-                icon = 'bi-x-circle-fill';
-            }
-            
-            const toastEl = document.createElement('div');
-            toastEl.className = `toast ${bgColor} text-white border-0 shadow`;
-            toastEl.innerHTML = `
-                <div class="toast-body d-flex align-items-center">
-                    <i class="bi ${icon} me-2 fs-5"></i>
-                    <span>${message}</span>
-                    <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="toast"></button>
-                </div>
-            `;
-            
-            toastContainer.appendChild(toastEl);
-            const toast = new bootstrap.Toast(toastEl);
-            toast.show();
-            
-            toastEl.addEventListener('hidden.bs.toast', function() {
-                toastEl.remove();
-            });
-        }
-
-        document.getElementById('loginForm').addEventListener('submit', async function (e) {
-            e.preventDefault();
-            
-            const submitBtn = this.querySelector('button[type="submit"]');
-            const originalText = submitBtn.innerHTML;
-            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Logging in...';
-            submitBtn.disabled = true;
-            
-            try {
-                const username = document.getElementById('username').value.trim();
-                const password = document.getElementById('password').value;
-                
-                // Basic validation
-                if (!username || !password) {
-                    showToast('Username dan password diperlukan', 'warning');
-                    return;
-                }
-                
-                const response = await fetch('/auth/login', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({ username, password })
-                });
-
-                const data = await response.json();
-                
-                if (data.success) {
-                    // Store token and user data
-                    localStorage.setItem('token', data.token);
-                    localStorage.setItem('user', JSON.stringify(data.user));
-                    
-                    console.log('🔍 Login response:', data);
-                    showToast(`Login berhasil!`, 'success');
-                    
-                    // Redirect immediately to dashboard
-                    window.location.href = '/dashboard';
-                } else {
-                    showToast(data.message || 'Login gagal', 'error');
-                }
-            } catch (error) {
-                console.error('Login error:', error);
-                showToast('Terjadi kesalahan saat login', 'error');
-            } finally {
-                submitBtn.innerHTML = originalText;
-                submitBtn.disabled = false;
-            }
-        });
-    </script>
-      
 </body>
 
 </html>

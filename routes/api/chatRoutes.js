@@ -2,11 +2,11 @@
 const express = require('express');
 const router = express.Router();
 const { getChatHistory, getAllChats, sendMessage } = require('../../controllers/api/chatController');
-const { authenticateToken } = require('../../auth');
+const { verifyToken } = require('../../middleware/authMiddleware');
 const { validateSession, checkConnection } = require('../../middleware/sessionMiddleware'); // Sesuaikan path
 
 // Middleware untuk validasi sesi dan autentikasi
-router.use(authenticateToken);
+router.use(verifyToken);
 router.use('/:sessionId', validateSession);
 router.use('/:sessionId', checkConnection);
 

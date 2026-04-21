@@ -22,7 +22,10 @@ const validateSessionId = (req, res, next) => {
 
 
 
-// Apply session validation to all routes
+const { verifyToken } = require('../../middleware/authMiddleware');
+
+// Apply authentication and session validation to all routes
+router.use(verifyToken);
 router.use('/:sessionId/*', validateSessionId);
 
 // === BROADCAST LISTS ROUTES ===

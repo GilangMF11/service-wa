@@ -1,18 +1,16 @@
 <main class="nxl-container">
   <div class="nxl-content">
     <!-- [ page-header ] start -->
-    <div class="page-header mb-4">
-      <div class="page-header-left d-flex align-items-center">
-        <div class="page-header-title">
-          <h4 class="fw-bold text-primary mb-1">Sessions</h4>
+    <div class="page-header">
+        <div class="page-header-left d-flex align-items-center">
+            <div class="page-header-title">
+                <h5 class="m-b-10">Sessions</h5>
+            </div>
+            <ul class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/dashboard">Home</a></li>
+                <li class="breadcrumb-item">Sessions</li>
+            </ul>
         </div>
-        <nav aria-label="breadcrumb">
-          <ol class="breadcrumb ms-3 mb-0">
-            <li class="breadcrumb-item"><a href="/" class="text-decoration-none">Home</a></li>
-            <li class="breadcrumb-item active">Sessions</li>
-          </ol>
-        </nav>
-      </div>
     </div>
     <!-- [ page-header ] end -->
 
@@ -44,49 +42,64 @@
 </main>
 
 <style>
-  .hover-shadow {
-    transition: all 0.3s ease;
-    border-radius: 12px;
+  .session-card {
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    border: 1px solid rgba(0,0,0,0.05) !important;
   }
   
-  .hover-shadow:hover {
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1) !important;
-    transform: translateY(-5px);
+  .session-card:hover {
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08) !important;
+    transform: translateY(-6px);
+    border-color: rgba(74, 107, 255, 0.2) !important;
   }
   
-  .card {
-    border-radius: 12px;
-    overflow: hidden;
-  }
-  
-  .status-badge {
-    padding: 6px 12px;
-    border-radius: 50px;
-    font-size: 12px;
-    font-weight: 600;
-  }
-  
-  .session-details p {
-    margin-bottom: 8px;
+  .avatar-text {
+    width: 48px;
+    height: 48px;
     display: flex;
     align-items: center;
+    justify-content: center;
   }
+
+  .bg-soft-primary { background-color: rgba(74, 107, 255, 0.1); }
+  .text-primary { color: #4a6bff !important; }
   
-  .session-details .icon {
-    width: 20px;
-    margin-right: 8px;
-    text-align: center;
+  .bg-soft-success { background-color: rgba(32, 201, 151, 0.1); }
+  .text-success { color: #20c997 !important; }
+  
+  .bg-soft-danger { background-color: rgba(220, 53, 69, 0.1); }
+  .text-danger { color: #dc3545 !important; }
+
+  .bg-soft-warning { background-color: rgba(255, 193, 7, 0.1); }
+
+  .border-dashed {
+    border-top: 1px dashed rgba(0,0,0,0.1);
+    opacity: 1;
   }
-  
+
+  .font-monospace {
+    font-family: 'SFMono-Regular', Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  }
+
+  /* Smooth fade icon on hover */
+  .session-card .manage-icon {
+    transition: transform 0.2s ease;
+  }
+  .session-card:hover .manage-icon {
+    transform: translateX(4px);
+  }
+
   .btn-primary {
-    background: linear-gradient(45deg, #4a6bff, #657eff);
+    background: linear-gradient(135deg, #4a6bff 0%, #3955d8 100%);
     border: none;
-    box-shadow: 0 4px 12px rgba(74, 107, 255, 0.2);
+    box-shadow: 0 4px 12px rgba(74, 107, 255, 0.25);
+    transition: all 0.3s ease;
   }
   
   .btn-primary:hover {
-    background: linear-gradient(45deg, #3955d8, #4a6bff);
-    box-shadow: 0 6px 16px rgba(74, 107, 255, 0.3);
+    background: linear-gradient(135deg, #3955d8 0%, #2f45b5 100%);
+    box-shadow: 0 6px 16px rgba(74, 107, 255, 0.35);
+    transform: translateY(-1px);
   }
 </style>
 
@@ -117,7 +130,7 @@
       if (!data.success) {
         container.innerHTML = `
           <div class="col-12 text-center py-5">
-            <i class="bi bi-exclamation-circle text-danger fs-1 mb-3"></i>
+            <i class="feather-alert-circle text-danger fs-1 mb-3"></i>
             <h5 class="text-danger">Gagal memuat session</h5>
             <p class="text-muted">Silakan coba lagi nanti</p>
           </div>
@@ -128,9 +141,9 @@
       if (data.sessions.length === 0) {
         container.innerHTML = `
           <div class="col-12 text-center py-5">
-            <i class="bi bi-chat-left-dots fs-1 text-muted mb-3"></i>
+            <i class="feather-inbox fs-1 text-muted mb-3 d-block"></i>
             <h5 class="text-muted">Tidak ada session ditemukan</h5>
-            <p class="text-muted">Buat session baru untuk memulai</p>
+            <p class="text-muted">Buat session baru untuk memulai mengirim pesan</p>
           </div>
         `;
         return;
@@ -140,48 +153,94 @@
 
       data.sessions.forEach((session) => {
         const card = document.createElement('div');
-        card.className = 'col-md-6 col-lg-4';
+        card.className = 'col-md-6 col-lg-4 col-xl-3'; // Responsive grid fit for Pro UI
 
         const formattedDate = new Date(session.created_at).toLocaleDateString('id-ID', {
           day: 'numeric',
-          month: 'long',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
+          month: 'short',
+          year: 'numeric'
         });
 
+        // Determine Status Styles
+        const statusBadgeClasses = session.isConnected 
+          ? 'bg-soft-success text-success' 
+          : 'bg-soft-danger text-danger';
+
+        const statusIcon = session.isConnected 
+          ? '<i class="feather-check-circle me-1"></i>' 
+          : '<i class="feather-wifi-off me-1"></i>';
+        
+        // Determine QR Status View
+        let qrStatusHtml = '';
+        if (session.isConnected) {
+            qrStatusHtml = '<span class="text-success"><i class="feather-shield"></i> Synced</span>';
+        } else if (session.hasQrCode) {
+            qrStatusHtml = '<span class="text-warning"><i class="feather-maximize"></i> Scan Ready</span>';
+        } else {
+            qrStatusHtml = '<span class="text-danger"><i class="feather-x"></i> Invalid</span>';
+        }
+
+        // WhatsApp Phone Number or ID
+        const phoneStr = String(session.phoneNumber || '');
+        const phoneDisplay = session.phoneNumber && session.phoneNumber !== 'Unknown' 
+          ? `+${phoneStr.split('@')[0]}` 
+          : `${session.session_id.substring(0, 8)}...`;
+
         card.innerHTML = `
-          <a href="/sessions/detail?id=${session.session_id}" class="text-decoration-none text-dark">
-            <div class="card h-100 shadow-sm hover-shadow border-0">
-              <div class="card-header bg-white border-0 pt-4 pb-0 px-4">
-                <div class="d-flex justify-content-between align-items-center">
-                  <h5 class="card-title fw-bold mb-0">Session ID</h5>
-                  <span class="status-badge ${session.isConnected ? 'bg-success' : 'bg-danger'}">
-                    ${session.isConnected ? 'Terhubung' : 'Belum Terhubung'}
-                  </span>
+          <a href="/sessions/detail?id=${session.session_id}" class="text-decoration-none">
+            <div class="card h-100 bg-white session-card rounded-4 overflow-hidden position-relative">
+              <div class="card-body p-4">
+                <!-- Header -->
+                <div class="d-flex justify-content-between align-items-start mb-4">
+                  <div class="d-flex align-items-center gap-3 w-100 pe-2">
+                    <div class="avatar-text flex-shrink-0 bg-soft-primary text-primary rounded-circle">
+                      <i class="feather-smartphone fs-5"></i>
+                    </div>
+                    <div class="text-truncate">
+                      <h6 class="fw-bolder text-dark mb-1 text-truncate" title="${session.description || 'WhatsApp Session'}">
+                        ${session.description || 'WhatsApp Session'}
+                      </h6>
+                      <p class="fs-12 text-muted mb-0 font-monospace">${phoneDisplay}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Divider -->
+                <hr class="border-dashed my-3">
+
+                <!-- Details Grid -->
+                <div class="row g-3">
+                  <div class="col-6">
+                    <div class="d-flex align-items-center gap-2 text-muted">
+                      <span class="fs-11 text-uppercase fw-bold tracking-wide">Status</span>
+                    </div>
+                    <div class="mt-1">
+                      <span class="badge ${statusBadgeClasses} rounded-pill px-2 py-1 fw-semibold fs-11 d-inline-flex align-items-center">
+                        ${statusIcon} ${session.isConnected ? 'Connected' : 'Disconnected'}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="col-6">
+                    <div class="d-flex align-items-center gap-2 text-muted">
+                      <span class="fs-11 text-uppercase fw-bold tracking-wide">Auth Status</span>
+                    </div>
+                    <p class="fw-semibold fs-13 mb-0 mt-1 d-flex align-items-center gap-1">
+                      ${qrStatusHtml}
+                    </p>
+                  </div>
                 </div>
               </div>
-              <div class="card-body px-4 py-3">
-                <p class="mb-3 text-primary fw-bold">${session.session_id}</p>
-                
-                <div class="session-details">
-                  <p>
-                    <span class="icon"><i class="bi bi-person"></i></span>
-                    <span>User ID: <strong>${session.user_id}</strong></span>
-                  </p>
-                  <p>
-                    <span class="icon"><i class="bi bi-qr-code"></i></span>
-                    <span>QR Code: <strong>${session.hasQrCode ? 'Tersedia' : 'Tidak Tersedia'}</strong></span>
-                  </p>
-                  <p>
-                    <span class="icon"><i class="bi bi-card-text"></i></span>
-                    <span>Deskripsi: <strong>${session.description}</strong></span>
-                  </p>
+              
+              <!-- Footer -->
+              <div class="card-footer bg-light-subtle bg-opacity-50 border-top-0 px-4 py-3">
+                <div class="d-flex justify-content-between align-items-center text-muted fs-12">
+                  <span class="d-flex align-items-center gap-1 fw-medium">
+                    <i class="feather-calendar fs-12"></i> ${formattedDate}
+                  </span>
+                  <span class="d-flex align-items-center gap-1 text-primary fw-bold manage-text">
+                    Manage <i class="feather-chevron-right fs-12 manage-icon"></i>
+                  </span>
                 </div>
-                
-                <p class="text-muted small mt-4 mb-0">
-                  <i class="bi bi-calendar-event me-1"></i> Dibuat: ${formattedDate}
-                </p>
               </div>
             </div>
           </a>

@@ -128,79 +128,92 @@
                                     </div>
                                 </div>
                                 <div class="dropdown-divider my-3"></div>
-                                <div class="users-result px-4 py-2">
-                                    <h4 class="fs-13 fw-normal text-gray-600 mb-3">Users <span class="badge small bg-gray-200 rounded ms-1 text-dark">5</span></h4>
-                                    <div class="d-flex align-items-center justify-content-between mb-4">
-                                        <div class="d-flex align-items-center gap-3">
-                                            <div class="avatar-image rounded">
-                                                <img src="/assets/images/avatar/1.png" alt="" class="img-fluid" />
-                                            </div>
-                                            <div>
-                                                <a href="javascript:void(0);" class="font-body fw-bold d-block mb-1">Alexandra Della</a>
-                                                <p class="fs-11 text-muted mb-0">alex.della@outlook.com</p>
-                                            </div>
-                                        </div>
-                                        <a href="javascript:void(0);" class="avatar-text avatar-md">
-                                            <i class="feather-chevron-right"></i>
-                                        </a>
+                                <div class="users-result px-4 py-2" id="dynamic-users-result">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h4 class="fs-13 fw-normal text-gray-600 mb-0">System Users</h4>
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status" id="users-search-spinner" style="display: none;"></div>
                                     </div>
-                                    <div class="d-flex align-items-center justify-content-between mb-4">
-                                        <div class="d-flex align-items-center gap-3">
-                                            <div class="avatar-image rounded">
-                                                <img src="/assets/images/avatar/2.png" alt="" class="img-fluid" />
-                                            </div>
-                                            <div>
-                                                <a href="javascript:void(0);" class="font-body fw-bold d-block mb-1">Green Cute</a>
-                                                <p class="fs-11 text-muted mb-0">green.cute@outlook.com</p>
-                                            </div>
-                                        </div>
-                                        <a href="javascript:void(0);" class="avatar-text avatar-md">
-                                            <i class="feather-chevron-right"></i>
-                                        </a>
-                                    </div>
-                                    <div class="d-flex align-items-center justify-content-between mb-4">
-                                        <div class="d-flex align-items-center gap-3">
-                                            <div class="avatar-image rounded">
-                                                <img src="/assets/images/avatar/3.png" alt="" class="img-fluid" />
-                                            </div>
-                                            <div>
-                                                <a href="javascript:void(0);" class="font-body fw-bold d-block mb-1">Malanie Hanvey</a>
-                                                <p class="fs-11 text-muted mb-0">malanie.anvey@outlook.com</p>
-                                            </div>
-                                        </div>
-                                        <a href="javascript:void(0);" class="avatar-text avatar-md">
-                                            <i class="feather-chevron-right"></i>
-                                        </a>
-                                    </div>
-                                    <div class="d-flex align-items-center justify-content-between mb-4">
-                                        <div class="d-flex align-items-center gap-3">
-                                            <div class="avatar-image rounded">
-                                                <img src="/assets/images/avatar/4.png" alt="" class="img-fluid" />
-                                            </div>
-                                            <div>
-                                                <a href="javascript:void(0);" class="font-body fw-bold d-block mb-1">Kenneth Hune</a>
-                                                <p class="fs-11 text-muted mb-0">kenth.hune@outlook.com</p>
-                                            </div>
-                                        </div>
-                                        <a href="javascript:void(0);" class="avatar-text avatar-md">
-                                            <i class="feather-chevron-right"></i>
-                                        </a>
-                                    </div>
-                                    <div class="d-flex align-items-center justify-content-between mb-0">
-                                        <div class="d-flex align-items-center gap-3">
-                                            <div class="avatar-image rounded">
-                                                <img src="/assets/images/avatar/5.png" alt="" class="img-fluid" />
-                                            </div>
-                                            <div>
-                                                <a href="javascript:void(0);" class="font-body fw-bold d-block mb-1">Archie Cantones</a>
-                                                <p class="fs-11 text-muted mb-0">archie.cones@outlook.com</p>
-                                            </div>
-                                        </div>
-                                        <a href="javascript:void(0);" class="avatar-text avatar-md">
-                                            <i class="feather-chevron-right"></i>
-                                        </a>
+                                    <div id="users-list-container">
+                                        <p class="text-muted fs-11">Mulai mencari...</p>
                                     </div>
                                 </div>
+                                <script>
+                                    // Script to dynamically fetch and display users in the header search dropdown
+                                    document.addEventListener('DOMContentLoaded', () => {
+                                        const searchInput = document.querySelector('.search-input-field');
+                                        const usersContainer = document.getElementById('users-list-container');
+                                        const spinner = document.getElementById('users-search-spinner');
+
+                                        async function fetchUsers(query = '') {
+                                            if (!usersContainer) return;
+                                            try {
+                                                spinner.style.display = 'block';
+                                                const token = localStorage.getItem('token');
+                                                const res = await fetch('/api/users', {
+                                                    headers: { 'Authorization': 'Bearer ' + token }
+                                                });
+                                                const data = await res.json();
+                                                
+                                                if (data.success && data.users) {
+                                                    // Filter locally if query exists
+                                                    let filteredUsers = data.users;
+                                                    if (query) {
+                                                        const q = query.toLowerCase();
+                                                        filteredUsers = filteredUsers.filter(u => 
+                                                            (u.username && u.username.toLowerCase().includes(q)) || 
+                                                            (u.email && u.email.toLowerCase().includes(q))
+                                                        );
+                                                    }
+                                                    
+                                                    // Ambil max 5
+                                                    filteredUsers = filteredUsers.slice(0, 5);
+
+                                                    if (filteredUsers.length === 0) {
+                                                        usersContainer.innerHTML = '<p class="text-muted fs-11 mb-0">Tidak ada user ditemukan.</p>';
+                                                    } else {
+                                                        usersContainer.innerHTML = filteredUsers.map(u => `
+                                                            <div class="d-flex align-items-center justify-content-between mb-4">
+                                                                <div class="d-flex align-items-center gap-3">
+                                                                    <div class="avatar-text avatar-sm bg-soft-primary text-primary rounded-circle fw-bold">
+                                                                        ${u.username ? u.username.charAt(0).toUpperCase() : 'U'}
+                                                                    </div>
+                                                                    <div>
+                                                                        <a href="javascript:void(0);" class="font-body fw-bold d-block mb-1">${u.username || 'Unknown User'}</a>
+                                                                        <p class="fs-11 text-muted mb-0">${u.role || 'User'} ${u.email ? '• ' + u.email : ''}</p>
+                                                                    </div>
+                                                                </div>
+                                                                <a href="javascript:void(0);" class="avatar-text avatar-md">
+                                                                    <i class="feather-chevron-right"></i>
+                                                                </a>
+                                                            </div>
+                                                        `).join('');
+                                                    }
+                                                }
+                                            } catch (error) {
+                                                console.error('Error fetching users for header:', error);
+                                                usersContainer.innerHTML = '<p class="text-danger fs-11">Gagal memuat data</p>';
+                                            } finally {
+                                                spinner.style.display = 'none';
+                                            }
+                                        }
+
+                                        // Listen to input for live search
+                                        if (searchInput) {
+                                            let debounceTimer;
+                                            searchInput.addEventListener('input', (e) => {
+                                                clearTimeout(debounceTimer);
+                                                debounceTimer = setTimeout(() => {
+                                                    fetchUsers(e.target.value);
+                                                }, 300);
+                                            });
+                                            
+                                            // Fetch initial on dropdown open
+                                            searchInput.addEventListener('focus', () => {
+                                                if (usersContainer.innerHTML.includes('Mulai')) fetchUsers('');
+                                            });
+                                        }
+                                    });
+                                </script>
                                 <div class="dropdown-divider my-3"></div>
                                 <div class="file-result px-4 py-2">
                                     <h4 class="fs-13 fw-normal text-gray-600 mb-3">Files <span class="badge small bg-gray-200 rounded ms-1 text-dark">3</span></h4>
